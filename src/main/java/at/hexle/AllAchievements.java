@@ -10,6 +10,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -47,7 +48,16 @@ public class AllAchievements extends JavaPlugin implements Listener {
 
         List<String> list = this.getConfig().getStringList("advancements");
         for(String s : list){
-            finishedAdvancementList.add(Bukkit.getAdvancement(NamespacedKey.minecraft(s.split(":")[1])));
+            if (s.contains(":")) {
+                try {
+                    Advancement adv = Bukkit.getAdvancement(NamespacedKey.minecraft(s.split(":")[1]));
+                    if (adv != null) {
+                        finishedAdvancementList.add(adv);
+                    }
+                } catch (Exception e) {
+                    getLogger().warning("Failed to load advancement: " + s);
+                }
+            }
         }
 
         Bukkit.getConsoleSender().sendMessage("------------------------------------------------------");
@@ -60,7 +70,10 @@ public class AllAchievements extends JavaPlugin implements Listener {
         Bukkit.getConsoleSender().sendMessage("");
         Bukkit.getConsoleSender().sendMessage("Hexle_Development_Systems - https://hexle.at");
         Bukkit.getConsoleSender().sendMessage("");
-        if(!version.startsWith("v1_20")
+
+        // Updated version check to include newest Minecraft versions (1.21.4, 1.21+)
+        if(!version.startsWith("v1_21")
+                && !version.startsWith("v1_20")
                 && !version.startsWith("v1_19")
                 && !version.startsWith("v1_18")
                 && !version.startsWith("v1_17")
@@ -73,7 +86,10 @@ public class AllAchievements extends JavaPlugin implements Listener {
             Bukkit.getConsoleSender().sendMessage("");
             Bukkit.getConsoleSender().sendMessage("------------------------------------------------------");
             getPluginLoader().disablePlugin(this);
+            return;
         }
+
+        getLogger().info("Minecraft version detected: " + version);
         Bukkit.getConsoleSender().sendMessage("");
         Bukkit.getConsoleSender().sendMessage("------------------------------------------------------");
 
@@ -82,7 +98,8 @@ public class AllAchievements extends JavaPlugin implements Listener {
 
         Bukkit.getPluginManager().registerEvents(new Events(), this);
 
-        Bukkit.getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
+        // Use BukkitRunnable for timer
+        new BukkitRunnable() {
             @Override
             public void run() {
                 if(timer && Bukkit.getOnlinePlayers().size() > 0){
@@ -92,13 +109,13 @@ public class AllAchievements extends JavaPlugin implements Listener {
                     for(Player player : Bukkit.getOnlinePlayers()){
                         player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(getTime()));
                     }
-                }else{
+                } else {
                     for(Player player : Bukkit.getOnlinePlayers()){
                         player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText("§6--:--"));
                     }
                 }
             }
-        }, 0L, 20L);
+        }.runTaskTimer(this, 0L, 20L);
 
         init();
     }
@@ -109,7 +126,9 @@ public class AllAchievements extends JavaPlugin implements Listener {
         FileConfiguration config = this.getConfig();
         List<String> names = new ArrayList<>();
         for(Advancement a : finishedAdvancementList){
-            names.add(a.getKey().toString());
+            if (a != null && a.getKey() != null) {
+                names.add(a.getKey().toString());
+            }
         }
         config.set("advancements", names);
         config.set("timer", timerseconds);
@@ -121,32 +140,48 @@ public class AllAchievements extends JavaPlugin implements Listener {
         while(advancementIterator.hasNext()){
             Advancement a = advancementIterator.next();
             try {
-                if(version.startsWith("v1_19") || version.startsWith("v1_20")){
-                    if (Objects.requireNonNull(a.getDisplay()).shouldAnnounceChat()) {
+                // Updated version check to include newest Minecraft versions
+                if(isNewerVersion()){
+                    if (a != null && a.getDisplay() != null && a.getDisplay().shouldAnnounceChat()) {
                         advancementList.add(a);
                     }
-                }else {
+                } else {
                     AdvancementInfo info = new AdvancementInfo(a);
                     if(info != null && info.announceToChat()){
                         advancementList.add(a);
                     }
                 }
-            }catch (Exception e){}
+            } catch (Exception e){
+                getLogger().warning("Error processing advancement: " + e.getMessage());
+            }
         }
+        getLogger().info("Loaded " + advancementList.size() + " advancements");
     }
 
-
+    /**
+     * Helper method to check if we're on Minecraft 1.19+
+     */
+    private boolean isNewerVersion() {
+        return version.startsWith("v1_21") || version.startsWith("v1_20") || version.startsWith("v1_19");
+    }
 
     public List<String> getFinishedAchievements(){
         List<String> finishedStrings = new ArrayList<>();
-        if(version.startsWith("v1_19") || version.startsWith("v1_20")){
+        // Updated version check to include newest Minecraft versions
+        if(isNewerVersion()){
             for(Advancement advancement : finishedAdvancementList){
-                finishedStrings.add(advancement.getDisplay().getTitle());
+                if (advancement != null && advancement.getDisplay() != null) {
+                    finishedStrings.add(advancement.getDisplay().getTitle());
+                }
             }
-        }else{
+        } else {
             for(Advancement advancement : finishedAdvancementList){
-                AdvancementInfo info = new AdvancementInfo(advancement);
-                finishedStrings.add(info.getTitle());
+                if (advancement != null) {
+                    AdvancementInfo info = new AdvancementInfo(advancement);
+                    if (info.getTitle() != null) {
+                        finishedStrings.add(info.getTitle());
+                    }
+                }
             }
         }
 
@@ -155,15 +190,22 @@ public class AllAchievements extends JavaPlugin implements Listener {
 
     public List<String> getAllAchievements(){
         List<String> allStrings = new ArrayList<>();
-        if(version.startsWith("v1_19") || version.startsWith("v1_20")){
+        // Updated version check to include newest Minecraft versions
+        if(isNewerVersion()){
             for(Advancement advancement : advancementList){
-                allStrings.add(advancement.getDisplay().getTitle());
+                if (advancement != null && advancement.getDisplay() != null) {
+                    allStrings.add(advancement.getDisplay().getTitle());
+                }
             }
-        }else{
+        } else {
             for(Advancement advancement : advancementList){
-                Advancement adv = Bukkit.getAdvancement(advancement.getKey());
-                AdvancementInfo info = new AdvancementInfo(adv);
-                allStrings.add(info.getTitle());
+                if (advancement != null) {
+                    Advancement adv = Bukkit.getAdvancement(advancement.getKey());
+                    AdvancementInfo info = new AdvancementInfo(adv);
+                    if (info.getTitle() != null) {
+                        allStrings.add(info.getTitle());
+                    }
+                }
             }
         }
         return allStrings;
@@ -174,44 +216,7 @@ public class AllAchievements extends JavaPlugin implements Listener {
     }
 
     public void pause(){
-        if(timer){
-            timer = false;
-        }else{
-            timer = true;
-        }
-    }
-
-    //Pre Feature - default world cannot be removed
-    public void restart(){
-        //restartTriggered = true;
-        //reset();
-        //for(Player player : Bukkit.getOnlinePlayers()){
-        //    player.kickPlayer("Challenge restarting...");
-        //}
-
-        //if(newWorldOnRestart && restartTriggered){
-        //    for(String world : worlds){
-        //        if(Bukkit.getWorld(world) == null) continue;
-        //        System.out.println("Generating new world: "+world);
-        //        File worldFile = Bukkit.getWorld(world).getWorldFolder();
-        //        Bukkit.unloadWorld(world, false);
-        //        worldFile.delete();
-        //    }
-        //    for(String world : worlds){
-        //        WorldCreator wc = new WorldCreator(world);
-        //        if(world.contains("nether")){
-        //            wc.environment(World.Environment.NETHER);
-        //        }else if(world.contains("end")) {
-        //            wc.environment(World.Environment.THE_END);
-        //        }else{
-        //            wc.environment(World.Environment.NORMAL);
-        //        }
-        //        wc.type(WorldType.NORMAL);
-        //        Bukkit.createWorld(wc);
-        //    }
-        //}
-
-        //restartTriggered = false;
+        timer = !timer;
     }
 
     public void reset(){
@@ -225,9 +230,14 @@ public class AllAchievements extends JavaPlugin implements Listener {
             }
             Iterator<Advancement> iterator = Bukkit.getServer().advancementIterator();
             while (iterator.hasNext()){
-                AdvancementProgress progress = player.getPlayer().getAdvancementProgress(iterator.next());
-                for (String criteria : progress.getAwardedCriteria()) progress.revokeCriteria(criteria);
-
+                try {
+                    AdvancementProgress progress = player.getPlayer().getAdvancementProgress(iterator.next());
+                    for (String criteria : progress.getAwardedCriteria()) {
+                        progress.revokeCriteria(criteria);
+                    }
+                } catch (Exception e) {
+                    getLogger().warning("Error resetting advancement for player: " + player.getName());
+                }
             }
         }
     }

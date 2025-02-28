@@ -27,6 +27,44 @@ public class AdvancementInfo extends NMSHandler {
      * @param adv the required advancement
      */
     public AdvancementInfo(Advancement adv) {
+        // Skip reflection for newer versions (1.19+) as they have direct API methods
+        if (MAJOR_VERSION >= 19) {
+            if (adv != null && adv.getDisplay() != null) {
+                this.title = adv.getDisplay().getTitle();
+                this.desc = adv.getDisplay().getDescription();
+                // getFrame doesn't exist directly in some versions, handle it differently
+                try {
+                    // Try to get advancement frame type using reflection
+                    Method frameMethod = adv.getDisplay().getClass().getMethod("getFrameType");
+                    Object frameEnum = frameMethod.invoke(adv.getDisplay());
+                    this.frameType = frameEnum.toString();
+                } catch (Exception e) {
+                    // Fallback to default PROGRESS
+                    this.frameType = "PROGRESS";
+                }
+
+                this.toChat = String.valueOf(adv.getDisplay().shouldAnnounceChat());
+                this.hidden = String.valueOf(adv.getDisplay().isHidden());
+                this.item = adv.getDisplay().getIcon();
+
+                // Try to get parent information using the key
+                try {
+                    Field parentField = adv.getClass().getDeclaredField("parent");
+                    parentField.setAccessible(true);
+                    Object parentObj = parentField.get(adv);
+                    if (parentObj != null) {
+                        this.parent = parentObj.toString();
+                    } else {
+                        this.parent = "null";
+                    }
+                } catch (Exception e) {
+                    this.parent = "null";
+                }
+                return;
+            }
+        }
+
+        // For older versions, we still need reflection
         Class<?> craftClass = getBukkitClass("advancement.CraftAdvancement");
         if (craftClass == null) return;
 

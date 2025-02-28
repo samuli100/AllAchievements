@@ -13,12 +13,16 @@ public class Stats {
     public static void showStats(Player player, int page){
         Inventory inv = Bukkit.createInventory(null, 54, "§6AllAchievements");
 
+        // Fill the inventory with black glass panes
+        ItemStack fillerItem;
+        if(AllAchievements.getInstance().getVersion().startsWith("v1_12")){
+            fillerItem = new ItemStack(Material.getMaterial("STAINED_GLASS_PANE"), 1, (byte)15);
+        } else {
+            fillerItem = new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1);
+        }
+
         for(int i = 0; i < 54; i++){
-            if(AllAchievements.getInstance().getVersion().startsWith("v1_12")){
-                inv.setItem(i, new ItemStack(Material.getMaterial("STAINED_GLASS_PANE"), 1, (byte)15));
-            }else{
-                inv.setItem(i, new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1));
-            }
+            inv.setItem(i, fillerItem);
         }
 
         List<String> finishedAdvancements = AllAchievements.getInstance().getFinishedAchievements();
@@ -31,54 +35,53 @@ public class Stats {
 
         int i = 0;
         for(String p : pag){
+            ItemStack is;
             if(finishedAdvancements.contains(p)){
-                ItemStack is = null;
+                // Use modern Material names for newer versions
                 if(AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
                     is = new ItemStack(Material.EMERALD, 1);
-                }else{
+                } else {
                     is = new ItemStack(Material.GREEN_DYE, 1);
                 }
-                ItemMeta im = is.getItemMeta();
-                im.setDisplayName("§6"+p);
-                is.setItemMeta(im);
-                inv.setItem(i, is);
-            }else{
-                ItemStack is = null;
+            } else {
+                // Use modern Material names for newer versions
                 if(AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
                     is = new ItemStack(Material.REDSTONE, 1);
-                }else{
+                } else {
                     is = new ItemStack(Material.RED_DYE, 1);
                 }
-                ItemMeta im = is.getItemMeta();
-                im.setDisplayName("§6"+p);
-                is.setItemMeta(im);
-                inv.setItem(i, is);
             }
+
+            ItemMeta im = is.getItemMeta();
+            im.setDisplayName("§6" + p);
+            is.setItemMeta(im);
+            inv.setItem(i, is);
             i++;
         }
 
-        ItemStack item4 = new ItemStack(Material.ARROW, 1);
-        ItemMeta im4 = item4.getItemMeta();
-        im4.setDisplayName("§6Last Page");
-        item4.setItemMeta(im4);
-        inv.setItem(48, item4);
+        // Navigation buttons
+        ItemStack prevPage = new ItemStack(Material.ARROW, 1);
+        ItemMeta prevMeta = prevPage.getItemMeta();
+        prevMeta.setDisplayName("§6Last Page");
+        prevPage.setItemMeta(prevMeta);
+        inv.setItem(48, prevPage);
 
-        ItemStack item6 = null;
+        ItemStack pageIndicator;
         if(AllAchievements.getInstance().getVersion().startsWith("v1_12")){
-            item6 = new ItemStack(Material.getMaterial("STAINED_GLASS_PANE"), 1, (byte)15);
-        }else{
-            item6 = new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1);
+            pageIndicator = new ItemStack(Material.getMaterial("STAINED_GLASS_PANE"), 1, (byte)15);
+        } else {
+            pageIndicator = new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1);
         }
-        ItemMeta im6 = item6.getItemMeta();
-        im6.setDisplayName("§6Page " + page);
-        item6.setItemMeta(im6);
-        inv.setItem(49, item6);
+        ItemMeta indicatorMeta = pageIndicator.getItemMeta();
+        indicatorMeta.setDisplayName("§6Page " + page);
+        pageIndicator.setItemMeta(indicatorMeta);
+        inv.setItem(49, pageIndicator);
 
-        ItemStack item5 = new ItemStack(Material.ARROW, 1);
-        ItemMeta im5 = item5.getItemMeta();
-        im5.setDisplayName("§6Next Page");
-        item5.setItemMeta(im5);
-        inv.setItem(50, item5);
+        ItemStack nextPage = new ItemStack(Material.ARROW, 1);
+        ItemMeta nextMeta = nextPage.getItemMeta();
+        nextMeta.setDisplayName("§6Next Page");
+        nextPage.setItemMeta(nextMeta);
+        inv.setItem(50, nextPage);
 
         player.openInventory(inv);
     }

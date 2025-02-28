@@ -20,11 +20,27 @@ public abstract class NMSHandler {
      */
     public static final int MAJOR_VERSION = Integer.parseInt(VERSION.split("\\.")[1]);
 
+    /**
+     * Get a class from the NMS package
+     * @param pack Package name
+     * @param name Class name
+     * @param useVs Whether to use the version string
+     * @return The class, or null if not found
+     */
     protected Class<?> getNMSClass(String pack, String name, boolean useVs) {
         Package aPackage = Bukkit.getServer().getClass().getPackage();
 
         String version = aPackage.getName().split("\\.")[3];
-        pack = pack != null ? pack : "net.minecraft.server";
+
+        // For Minecraft 1.17+, NMS classes are in different packages
+        if (MAJOR_VERSION >= 17) {
+            if (pack != null && pack.equals("net.minecraft.server")) {
+                // For 1.17+, most classes moved to just "net.minecraft"
+                pack = "net.minecraft";
+            }
+        } else {
+            pack = pack != null ? pack : "net.minecraft.server";
+        }
 
         try {
             return Class.forName(pack + (useVs ? "." + version : "") + "." + name);

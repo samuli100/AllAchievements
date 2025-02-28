@@ -1,11 +1,33 @@
+name: AllAchievements
 main: at.hexle.AllAchievements
+version: 1.1.0
+api-version: '1.16'
 authors:
   - HEXLE
   - Beni
   - Fabi
-version: 1.0.1
-api-version: 1.13
-name: AllAchievements
+  - Samuli100
+description: Track all advancements in your Minecraft server
 
 commands:
   av:
+    description: Main command for AllAchievements plugin
+    usage: /<command> [start|pause|reset|stats]
+    permission: av.command
+
+permissions:
+  av.command:
+    description: Allows using the base /av command
+    default: true
+  av.timer.start:
+    description: Allows starting the achievement challenge timer
+    default: op
+  av.timer.pause:
+    description: Allows pausing the achievement challenge timer
+    default: op
+  av.timer.reset:
+    description: Allows resetting the achievement challenge
+    default: op
+  av.stats:
+    description: Allows viewing achievement statistics
+    default: true
