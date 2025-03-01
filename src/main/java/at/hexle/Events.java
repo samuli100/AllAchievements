@@ -25,8 +25,10 @@ public class Events implements Listener {
 
         // Check if this is a valid advancement we should track
         boolean isValidAdvancement = false;
+        // FIXED: Add 1.21 to the version check
         if(AllAchievements.getInstance().getVersion().startsWith("v1_19") ||
-                AllAchievements.getInstance().getVersion().startsWith("v1_20")) {
+                AllAchievements.getInstance().getVersion().startsWith("v1_20") ||
+                AllAchievements.getInstance().getVersion().startsWith("v1_21")) {
             if (advancement != null && advancement.getDisplay() != null &&
                     advancement.getDisplay().shouldAnnounceChat()) {
                 isValidAdvancement = true;

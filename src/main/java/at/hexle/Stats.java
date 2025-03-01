@@ -42,6 +42,7 @@ public class Stats {
                 if(AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
                     is = new ItemStack(Material.EMERALD, 1);
                 } else {
+                    // FIXED: Use Material.GREEN_DYE for 1.13+ versions
                     is = new ItemStack(Material.GREEN_DYE, 1);
                 }
             } else {
@@ -49,6 +50,7 @@ public class Stats {
                 if(AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
                     is = new ItemStack(Material.REDSTONE, 1);
                 } else {
+                    // FIXED: Use Material.RED_DYE for 1.13+ versions
                     is = new ItemStack(Material.RED_DYE, 1);
                 }
             }

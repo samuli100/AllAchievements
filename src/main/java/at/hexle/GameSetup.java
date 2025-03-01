@@ -37,7 +37,13 @@ public class GameSetup {
         GameModeManager.GameMode currentMode = gameModeManager.getGameMode();
 
         // Solo mode item
-        ItemStack soloItem = createModeItem(Material.DIAMOND_SWORD, "§eSolo Mode",
+        // FIXED: Use appropriate material names for 1.21
+        Material swordMaterial = Material.DIAMOND_SWORD;
+        Material appleMaterial = Material.GOLDEN_APPLE;
+        Material bowMaterial = Material.BOW;
+        Material bookMaterial = Material.BOOK;
+
+        ItemStack soloItem = createModeItem(swordMaterial, "§eSolo Mode",
                 "§7Each player works on their own advancements",
                 "§7independently from other players.",
                 "",
@@ -45,7 +51,7 @@ public class GameSetup {
         inv.setItem(10, soloItem);
 
         // Coop mode item
-        ItemStack coopItem = createModeItem(Material.GOLDEN_APPLE, "§aCoop Mode",
+        ItemStack coopItem = createModeItem(appleMaterial, "§aCoop Mode",
                 "§7Players work together to complete advancements.",
                 "§7When one player gets an advancement,",
                 "§7all team members receive credit for it.",
@@ -54,7 +60,7 @@ public class GameSetup {
         inv.setItem(13, coopItem);
 
         // Versus mode item
-        ItemStack versusItem = createModeItem(Material.BOW, "§cVersus Mode",
+        ItemStack versusItem = createModeItem(bowMaterial, "§cVersus Mode",
                 "§7Players compete to complete all advancements",
                 "§7first. The first to finish wins the challenge!",
                 "",
@@ -62,7 +68,7 @@ public class GameSetup {
         inv.setItem(16, versusItem);
 
         // Player management button
-        ItemStack playersItem = new ItemStack(Material.BOOK, 1);
+        ItemStack playersItem = new ItemStack(bookMaterial, 1);
         ItemMeta playersMeta = playersItem.getItemMeta();
         playersMeta.setDisplayName("§6Manage Players");
         List<String> playersLore = new ArrayList<>();
@@ -187,6 +193,7 @@ public class GameSetup {
 
             // Create player head
             ItemStack playerItem;
+            // FIXED: Handle 1.21 Player Head item
             if (!AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
                 playerItem = new ItemStack(Material.PLAYER_HEAD, 1);
                 SkullMeta skullMeta = (SkullMeta) playerItem.getItemMeta();

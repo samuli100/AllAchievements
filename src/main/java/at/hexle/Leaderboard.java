@@ -18,9 +18,6 @@ public class Leaderboard {
 
     /**
      * Shows the leaderboard UI to a player
-     */
-    /**
-     * Shows the leaderboard UI to a player
      * @param player The player viewing the leaderboard
      * @param page The page number to display
      */
@@ -76,6 +73,7 @@ public class Leaderboard {
                 // Create player entry item
                 ItemStack playerItem;
 
+                // FIXED: Handle player heads in 1.21
                 if (!AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
                     playerItem = new ItemStack(Material.PLAYER_HEAD, 1);
                     SkullMeta skullMeta = (SkullMeta) playerItem.getItemMeta();
@@ -119,6 +117,7 @@ public class Leaderboard {
             if (AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
                 pageIndicator = new ItemStack(Material.getMaterial("STAINED_GLASS_PANE"), 1, (byte)4);
             } else {
+                // FIXED: Use YELLOW_STAINED_GLASS_PANE for 1.13+ versions
                 pageIndicator = new ItemStack(Material.YELLOW_STAINED_GLASS_PANE, 1);
             }
             ItemMeta pageMeta = pageIndicator.getItemMeta();

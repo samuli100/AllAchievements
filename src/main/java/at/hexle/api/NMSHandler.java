@@ -32,6 +32,7 @@ public abstract class NMSHandler {
 
         String version = aPackage.getName().split("\\.")[3];
 
+        // FIXED: Update to handle 1.21+ versions
         // For Minecraft 1.17+, NMS classes are in different packages
         if (MAJOR_VERSION >= 17) {
             if (pack != null && pack.equals("net.minecraft.server")) {
@@ -45,6 +46,15 @@ public abstract class NMSHandler {
         try {
             return Class.forName(pack + (useVs ? "." + version : "") + "." + name);
         } catch (Exception e) {
+            // Fallback for newer versions (1.17+)
+            if (pack.equals("net.minecraft") && MAJOR_VERSION >= 17) {
+                // Try the fully qualified name if it's a net.minecraft class
+                try {
+                    return Class.forName("net.minecraft." + name);
+                } catch (Exception ex) {
+                    return null;
+                }
+            }
             return null;
         }
     }

@@ -48,20 +48,23 @@ public class AllAchievements extends JavaPlugin implements Listener {
         gameModeManager = new GameModeManager(this);
 
         Bukkit.getConsoleSender().sendMessage("AllAchievements");
-        if(!version.startsWith("v1_20")
-                && !version.startsWith("v1_19")
-                && !version.startsWith("v1_18")
-                && !version.startsWith("v1_17")
-                && !version.startsWith("v1_16")
-                && !version.startsWith("v1_15")
-                && !version.startsWith("v1_14")
-                && !version.startsWith("v1_13")
-                && !version.startsWith("v1_12")){
-            Bukkit.getConsoleSender().sendMessage(ChatColor.RED+"Version not compatible: found "+version+" - required: 1.12+");
+        // FIXED: Add 1.21 to the supported versions list and reverse the logic
+        if(version.startsWith("v1_12") || version.startsWith("v1_13") ||
+                version.startsWith("v1_14") || version.startsWith("v1_15") ||
+                version.startsWith("v1_16") || version.startsWith("v1_17") ||
+                version.startsWith("v1_18") || version.startsWith("v1_19") ||
+                version.startsWith("v1_20") || version.startsWith("v1_21")){
+            // Version is compatible, continue loading
+            Bukkit.getConsoleSender().sendMessage(ChatColor.GREEN + "Version compatible: " + version);
+        } else {
+            // Version is not compatible
+            Bukkit.getConsoleSender().sendMessage(ChatColor.RED + "Version not compatible: found " + version + " - required: 1.12-1.21");
             Bukkit.getConsoleSender().sendMessage("");
             Bukkit.getConsoleSender().sendMessage("------------------------------------------------------");
             getPluginLoader().disablePlugin(this);
+            return; // Exit early to prevent further initialization
         }
+
         Bukkit.getConsoleSender().sendMessage("");
         Bukkit.getConsoleSender().sendMessage("------------------------------------------------------");
 
@@ -134,7 +137,8 @@ public class AllAchievements extends JavaPlugin implements Listener {
         while(advancementIterator.hasNext()){
             Advancement a = advancementIterator.next();
             try {
-                if(version.startsWith("v1_19") || version.startsWith("v1_20")){
+                // FIXED: Add 1.21 to the version check
+                if(version.startsWith("v1_19") || version.startsWith("v1_20") || version.startsWith("v1_21")){
                     if (Objects.requireNonNull(a.getDisplay()).shouldAnnounceChat()) {
                         advancementList.add(a);
                     }
@@ -156,7 +160,8 @@ public class AllAchievements extends JavaPlugin implements Listener {
     // Get all advancements as string list
     public List<String> getAllAchievements(){
         List<String> allStrings = new ArrayList<>();
-        if(version.startsWith("v1_19") || version.startsWith("v1_20")){
+        // FIXED: Add 1.21 to the version check
+        if(version.startsWith("v1_19") || version.startsWith("v1_20") || version.startsWith("v1_21")){
             for(Advancement advancement : advancementList){
                 allStrings.add(advancement.getDisplay().getTitle());
             }
