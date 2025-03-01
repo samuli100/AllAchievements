@@ -158,49 +158,52 @@ public class Events implements Listener {
     // Fix for the inventory click event handler in Stats section:
 
     @EventHandler
-    public void onInvClick(InventoryClickEvent event){
+    public void onInvClick(InventoryClickEvent event) {
         String title = event.getView().getTitle();
 
         // Handle clicks in achievement stats UI
-        if(title.contains("Achievements")){
+        if (title.contains("Achievements")) {
             event.setCancelled(true);
 
             // Get the player who clicked
             Player player = (Player) event.getWhoClicked();
 
             // Skip if not clicking navigation buttons
-            if(event.getSlot() != 48 && event.getSlot() != 50) {
+            if (event.getSlot() != 48 && event.getSlot() != 50) {
                 return;
             }
 
             // Get the current page from the inventory item
             String pageText = event.getInventory().getItem(49).getItemMeta().getDisplayName();
-            int page = Integer.parseInt(pageText.split(" ")[1]);
+            // Extract page number from "Page X of Y" format
+            int currentPage = Integer.parseInt(pageText.split(" ")[1]) - 1; // Convert to 0-based
+            int totalPages = Integer.parseInt(pageText.split(" ")[3]);      // Get total pages
 
-            // Handle navigation
-            if(event.getSlot() == 48){
-                page--;
-            }else if(event.getSlot() == 50){
-                page++;
+            // Handle navigation (with bounds checking)
+            if (event.getSlot() == 48 && currentPage > 0) {
+                // Previous page
+                currentPage--;
+            } else if (event.getSlot() == 50 && currentPage < totalPages - 1) {
+                // Next page
+                currentPage++;
             }
 
             // If looking at own stats
-            if(title.equals("§6" + player.getName() + "'s Achievements")) {
-                Stats.showStats(player, player, page);
+            if (title.equals("§6" + player.getName() + "'s Achievements")) {
+                Stats.showStats(player, player, currentPage);
             }
             // If looking at someone else's stats
-            else if(title.contains("'s Achievements")) {
+            else if (title.contains("'s Achievements")) {
                 String targetName = title.replace("§6", "").replace("'s Achievements", "");
                 Player targetPlayer = Bukkit.getPlayer(targetName);
-                if(targetPlayer != null) {
-                    Stats.showStats(player, targetPlayer, page);
+                if (targetPlayer != null) {
+                    Stats.showStats(player, targetPlayer, currentPage);
                 } else {
                     player.closeInventory();
                     player.sendMessage("§cPlayer is no longer online.");
                 }
             }
         }
-
         // Handle clicks in leaderboard UI
         else if(title.equals("§6Achievement Leaderboard")) {
             event.setCancelled(true);
