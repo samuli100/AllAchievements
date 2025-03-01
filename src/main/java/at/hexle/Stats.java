@@ -10,7 +10,7 @@ import java.util.List;
 
 public class Stats {
 
-    public static void showStats(Player player, int page){
+    public static void showStats(Player player, Player targetPlayer, int page){
         Inventory inv = Bukkit.createInventory(null, 54, "§6AllAchievements");
 
         // Fill the inventory with black glass panes

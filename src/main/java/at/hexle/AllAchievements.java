@@ -5,28 +5,26 @@ import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
 import org.bukkit.advancement.Advancement;
-import org.bukkit.advancement.AdvancementProgress;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 public class AllAchievements extends JavaPlugin implements Listener {
 
     private List<Advancement> advancementList;
-    private List<Advancement> finishedAdvancementList;
-
     private String version = "";
 
-    private boolean timer = false;
-    private int timerseconds = 0;
-    private List<String> resetPlayers;
+    // Player manager for multiplayer support
+    private PlayerManager playerManager;
+
+    // Game mode manager for coop/versus modes
+    private GameModeManager gameModeManager;
 
     private static AllAchievements instance;
 
@@ -34,8 +32,6 @@ public class AllAchievements extends JavaPlugin implements Listener {
     public void onEnable(){
         instance = this;
         advancementList = new ArrayList<>();
-        finishedAdvancementList = new ArrayList<>();
-        resetPlayers = new ArrayList<>();
 
         try{
             version = Bukkit.getServer().getClass().getPackage().getName().split("\\.")[3];
@@ -44,21 +40,12 @@ public class AllAchievements extends JavaPlugin implements Listener {
         }
 
         this.saveDefaultConfig();
-        timerseconds = this.getConfig().getInt("timer");
 
-        List<String> list = this.getConfig().getStringList("advancements");
-        for(String s : list){
-            if (s.contains(":")) {
-                try {
-                    Advancement adv = Bukkit.getAdvancement(NamespacedKey.minecraft(s.split(":")[1]));
-                    if (adv != null) {
-                        finishedAdvancementList.add(adv);
-                    }
-                } catch (Exception e) {
-                    getLogger().warning("Failed to load advancement: " + s);
-                }
-            }
-        }
+        // Initialize player manager
+        playerManager = new PlayerManager(this);
+
+        // Initialize game mode manager
+        gameModeManager = new GameModeManager(this);
 
         Bukkit.getConsoleSender().sendMessage("------------------------------------------------------");
         Bukkit.getConsoleSender().sendMessage("");
@@ -70,10 +57,7 @@ public class AllAchievements extends JavaPlugin implements Listener {
         Bukkit.getConsoleSender().sendMessage("");
         Bukkit.getConsoleSender().sendMessage("Hexle_Development_Systems - https://hexle.at");
         Bukkit.getConsoleSender().sendMessage("");
-
-        // Updated version check to include newest Minecraft versions (1.21.4, 1.21+)
-        if(!version.startsWith("v1_21")
-                && !version.startsWith("v1_20")
+        if(!version.startsWith("v1_20")
                 && !version.startsWith("v1_19")
                 && !version.startsWith("v1_18")
                 && !version.startsWith("v1_17")
@@ -86,10 +70,7 @@ public class AllAchievements extends JavaPlugin implements Listener {
             Bukkit.getConsoleSender().sendMessage("");
             Bukkit.getConsoleSender().sendMessage("------------------------------------------------------");
             getPluginLoader().disablePlugin(this);
-            return;
         }
-
-        getLogger().info("Minecraft version detected: " + version);
         Bukkit.getConsoleSender().sendMessage("");
         Bukkit.getConsoleSender().sendMessage("------------------------------------------------------");
 
@@ -98,24 +79,53 @@ public class AllAchievements extends JavaPlugin implements Listener {
 
         Bukkit.getPluginManager().registerEvents(new Events(), this);
 
-        // Use BukkitRunnable for timer
-        new BukkitRunnable() {
+        // Timer task - now updates player-specific timers
+        Bukkit.getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
             @Override
             public void run() {
-                if(timer && Bukkit.getOnlinePlayers().size() > 0){
-                    timerseconds++;
-                }
-                if(timerseconds > 0){
-                    for(Player player : Bukkit.getOnlinePlayers()){
-                        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(getTime()));
+                // Update player timers
+                playerManager.updateTimers();
+
+                // Update action bar for each player
+                for(Player player : Bukkit.getOnlinePlayers()){
+                    UUID playerId = player.getUniqueId();
+
+                    // Check if player is in an active game mode
+                    if (gameModeManager.getGameMode() != GameModeManager.GameMode.SOLO &&
+                            !gameModeManager.isPlayerActive(playerId)) {
+                        continue; // Skip players not in the active game
                     }
-                } else {
-                    for(Player player : Bukkit.getOnlinePlayers()){
-                        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText("§6--:--"));
+
+                    PlayerManager.PlayerData data = playerManager.getPlayerData(playerId);
+
+                    // Display timer or just a default message
+                    if(data.getTimerSeconds() > 0 || data.isTimerRunning()){
+                        String gameMode = "";
+                        if (gameModeManager.getGameMode() == GameModeManager.GameMode.COOP) {
+                            gameMode = " §7[§aCoop§7]";
+                        } else if (gameModeManager.getGameMode() == GameModeManager.GameMode.VERSUS) {
+                            gameMode = " §7[§cVersus§7]";
+                        }
+
+                        // Get player progress
+                        int total = advancementList.size();
+                        int completed = playerManager.getPlayerData(playerId).getCompletedAdvancements().size();
+                        String progress = String.format("§7[%d/%d]", completed, total);
+
+                        // Show timer with game mode and progress
+                        player.spigot().sendMessage(
+                                ChatMessageType.ACTION_BAR,
+                                TextComponent.fromLegacyText(playerManager.getFormattedTime(playerId) + gameMode + " " + progress)
+                        );
+                    } else {
+                        player.spigot().sendMessage(
+                                ChatMessageType.ACTION_BAR,
+                                TextComponent.fromLegacyText("§6--:--")
+                        );
                     }
                 }
             }
-        }.runTaskTimer(this, 0L, 20L);
+        }, 0L, 20L);
 
         init();
     }
@@ -123,16 +133,10 @@ public class AllAchievements extends JavaPlugin implements Listener {
     @Override
     public void onDisable(){
         Bukkit.getConsoleSender().sendMessage("Plugin shutdown...");
-        FileConfiguration config = this.getConfig();
-        List<String> names = new ArrayList<>();
-        for(Advancement a : finishedAdvancementList){
-            if (a != null && a.getKey() != null) {
-                names.add(a.getKey().toString());
-            }
-        }
-        config.set("advancements", names);
-        config.set("timer", timerseconds);
-        saveConfig();
+        // Save all player data
+        playerManager.saveAllPlayerData();
+        // Save game mode data
+        gameModeManager.saveConfig();
     }
 
     public void init(){
@@ -140,106 +144,73 @@ public class AllAchievements extends JavaPlugin implements Listener {
         while(advancementIterator.hasNext()){
             Advancement a = advancementIterator.next();
             try {
-                // Updated version check to include newest Minecraft versions
-                if(isNewerVersion()){
-                    if (a != null && a.getDisplay() != null && a.getDisplay().shouldAnnounceChat()) {
+                if(version.startsWith("v1_19") || version.startsWith("v1_20")){
+                    if (Objects.requireNonNull(a.getDisplay()).shouldAnnounceChat()) {
                         advancementList.add(a);
                     }
-                } else {
+                }else {
                     AdvancementInfo info = new AdvancementInfo(a);
                     if(info != null && info.announceToChat()){
                         advancementList.add(a);
                     }
                 }
-            } catch (Exception e){
-                getLogger().warning("Error processing advancement: " + e.getMessage());
-            }
+            }catch (Exception e){}
         }
-        getLogger().info("Loaded " + advancementList.size() + " advancements");
     }
 
-    /**
-     * Helper method to check if we're on Minecraft 1.19+
-     */
-    private boolean isNewerVersion() {
-        return version.startsWith("v1_21") || version.startsWith("v1_20") || version.startsWith("v1_19");
+    // Get a player's completed advancements as string list
+    public List<String> getFinishedAchievements(UUID playerId){
+        return playerManager.getPlayerData(playerId).getCompletedAdvancements();
     }
 
-    public List<String> getFinishedAchievements(){
-        List<String> finishedStrings = new ArrayList<>();
-        // Updated version check to include newest Minecraft versions
-        if(isNewerVersion()){
-            for(Advancement advancement : finishedAdvancementList){
-                if (advancement != null && advancement.getDisplay() != null) {
-                    finishedStrings.add(advancement.getDisplay().getTitle());
-                }
-            }
-        } else {
-            for(Advancement advancement : finishedAdvancementList){
-                if (advancement != null) {
-                    AdvancementInfo info = new AdvancementInfo(advancement);
-                    if (info.getTitle() != null) {
-                        finishedStrings.add(info.getTitle());
-                    }
-                }
-            }
-        }
-
-        return finishedStrings;
-    }
-
+    // Get all advancements as string list
     public List<String> getAllAchievements(){
         List<String> allStrings = new ArrayList<>();
-        // Updated version check to include newest Minecraft versions
-        if(isNewerVersion()){
+        if(version.startsWith("v1_19") || version.startsWith("v1_20")){
             for(Advancement advancement : advancementList){
-                if (advancement != null && advancement.getDisplay() != null) {
-                    allStrings.add(advancement.getDisplay().getTitle());
-                }
+                allStrings.add(advancement.getDisplay().getTitle());
             }
-        } else {
+        }else{
             for(Advancement advancement : advancementList){
-                if (advancement != null) {
-                    Advancement adv = Bukkit.getAdvancement(advancement.getKey());
-                    AdvancementInfo info = new AdvancementInfo(adv);
-                    if (info.getTitle() != null) {
-                        allStrings.add(info.getTitle());
-                    }
-                }
+                Advancement adv = Bukkit.getAdvancement(advancement.getKey());
+                AdvancementInfo info = new AdvancementInfo(adv);
+                allStrings.add(info.getTitle());
             }
         }
         return allStrings;
     }
 
-    public void start(){
-        timer = true;
+    // Start timer for a specific player
+    public void start(UUID playerId){
+        playerManager.startTimer(playerId);
     }
 
-    public void pause(){
-        timer = !timer;
+    // Pause/resume timer for a specific player
+    public void pause(UUID playerId){
+        playerManager.toggleTimer(playerId);
     }
 
-    public void reset(){
-        timer = false;
-        timerseconds = 0;
-        finishedAdvancementList.clear();
-        for(OfflinePlayer player : Bukkit.getOfflinePlayers()){
-            if(player.getPlayer() == null){
-                resetPlayers.add(player.getUniqueId().toString());
-                continue;
-            }
-            Iterator<Advancement> iterator = Bukkit.getServer().advancementIterator();
-            while (iterator.hasNext()){
-                try {
-                    AdvancementProgress progress = player.getPlayer().getAdvancementProgress(iterator.next());
-                    for (String criteria : progress.getAwardedCriteria()) {
-                        progress.revokeCriteria(criteria);
-                    }
-                } catch (Exception e) {
-                    getLogger().warning("Error resetting advancement for player: " + player.getName());
-                }
-            }
-        }
+    // Reset progress for a specific player
+    public void reset(UUID playerId){
+        playerManager.resetPlayer(playerId);
+    }
+
+    // Get formatted time for a specific player
+    public String getTime(UUID playerId){
+        return playerManager.getFormattedTime(playerId);
+    }
+
+    // Check if timer is running for a specific player
+    public boolean isRunning(UUID playerId){
+        return playerManager.getPlayerData(playerId).isTimerRunning();
+    }
+
+    public PlayerManager getPlayerManager() {
+        return playerManager;
+    }
+
+    public GameModeManager getGameModeManager() {
+        return gameModeManager;
     }
 
     public static AllAchievements getInstance(){
@@ -250,30 +221,25 @@ public class AllAchievements extends JavaPlugin implements Listener {
         return advancementList;
     }
 
-    public List<Advancement> getFinishedAdvancementList() {
-        return finishedAdvancementList;
-    }
-
-    public String getTime(){
-        int hours = timerseconds / 3600;
-        int remainder = timerseconds % 3600;
-        int minutes = remainder / 60;
-        int seconds = remainder % 60;
-
-        String time = String.format("%02d:%02d:%02d", hours, minutes, seconds);
-
-        return "§6" + time;
-    }
-
-    public boolean isRunning(){
-        return timer;
-    }
-
     public String getVersion(){
         return version;
     }
 
-    public List<String> getResetPlayers(){
-        return resetPlayers;
+    // Check if a player has completed an advancement
+    public boolean hasCompletedAdvancement(UUID playerId, Advancement advancement) {
+        return playerManager.hasCompletedAdvancement(playerId, advancement.getKey().toString());
+    }
+
+    // Mark an advancement as completed for a player
+    public void completeAdvancement(UUID playerId, Advancement advancement) {
+        String advancementKey = advancement.getKey().toString();
+
+        // Handle based on game mode (solo, coop, versus)
+        if (gameModeManager.isGameActive() && gameModeManager.isPlayerActive(playerId)) {
+            gameModeManager.handleAdvancementCompletion(playerId, advancementKey);
+        } else {
+            // Normal solo handling
+            playerManager.completeAdvancement(playerId, advancementKey);
+        }
     }
 }
