@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -50,11 +51,12 @@ public class GameModeManager {
 
         config = YamlConfiguration.loadConfiguration(configFile);
 
-        // Load game mode
+        // Load game mode (using toUpperCase to handle lowercase config values)
         String modeStr = config.getString("gameMode", "SOLO");
         try {
-            currentGameMode = GameMode.valueOf(modeStr);
+            currentGameMode = GameMode.valueOf(modeStr.toUpperCase());
         } catch (IllegalArgumentException e) {
+            plugin.getLogger().warning("Invalid game mode in gamemode.yml: " + modeStr + ". Defaulting to SOLO.");
             currentGameMode = GameMode.SOLO;
         }
 
@@ -138,7 +140,8 @@ public class GameModeManager {
      * Get all players in the active game
      */
     public List<UUID> getActivePlayers() {
-        return new ArrayList<>(activePlayers);
+        // Return an unmodifiable copy to prevent external modifications
+        return Collections.unmodifiableList(new ArrayList<>(activePlayers));
     }
 
     /**
