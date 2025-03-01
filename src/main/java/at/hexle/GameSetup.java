@@ -25,25 +25,22 @@ public class GameSetup {
         Inventory inv = Bukkit.createInventory(null, 27, "§6AllAchievements §7- §eGame Setup");
 
         // Fill with glass
+        ItemStack fillerItem;
+        if (AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
+            fillerItem = new ItemStack(Material.getMaterial("STAINED_GLASS_PANE"), 1, (byte)15);
+        } else {
+            fillerItem = new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1);
+        }
+
         for (int i = 0; i < 27; i++) {
-            if (AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
-                inv.setItem(i, new ItemStack(Material.getMaterial("STAINED_GLASS_PANE"), 1, (byte)15));
-            } else {
-                inv.setItem(i, new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1));
-            }
+            inv.setItem(i, fillerItem);
         }
 
         GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
         GameModeManager.GameMode currentMode = gameModeManager.getGameMode();
 
         // Solo mode item
-        // FIXED: Use appropriate material names for 1.21
-        Material swordMaterial = Material.DIAMOND_SWORD;
-        Material appleMaterial = Material.GOLDEN_APPLE;
-        Material bowMaterial = Material.BOW;
-        Material bookMaterial = Material.BOOK;
-
-        ItemStack soloItem = createModeItem(swordMaterial, "§eSolo Mode",
+        ItemStack soloItem = createModeItem(Material.DIAMOND_SWORD, "§eSolo Mode",
                 "§7Each player works on their own advancements",
                 "§7independently from other players.",
                 "",
@@ -51,7 +48,7 @@ public class GameSetup {
         inv.setItem(10, soloItem);
 
         // Coop mode item
-        ItemStack coopItem = createModeItem(appleMaterial, "§aCoop Mode",
+        ItemStack coopItem = createModeItem(Material.GOLDEN_APPLE, "§aCoop Mode",
                 "§7Players work together to complete advancements.",
                 "§7When one player gets an advancement,",
                 "§7all team members receive credit for it.",
@@ -60,7 +57,7 @@ public class GameSetup {
         inv.setItem(13, coopItem);
 
         // Versus mode item
-        ItemStack versusItem = createModeItem(bowMaterial, "§cVersus Mode",
+        ItemStack versusItem = createModeItem(Material.BOW, "§cVersus Mode",
                 "§7Players compete to complete all advancements",
                 "§7first. The first to finish wins the challenge!",
                 "",
@@ -68,7 +65,7 @@ public class GameSetup {
         inv.setItem(16, versusItem);
 
         // Player management button
-        ItemStack playersItem = new ItemStack(bookMaterial, 1);
+        ItemStack playersItem = new ItemStack(Material.BOOK, 1);
         ItemMeta playersMeta = playersItem.getItemMeta();
         playersMeta.setDisplayName("§6Manage Players");
         List<String> playersLore = new ArrayList<>();
@@ -130,12 +127,15 @@ public class GameSetup {
         Inventory inv = Bukkit.createInventory(null, 54, "§6AllAchievements §7- §ePlayer Management");
 
         // Fill with glass
+        ItemStack fillerItem;
+        if (AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
+            fillerItem = new ItemStack(Material.getMaterial("STAINED_GLASS_PANE"), 1, (byte)15);
+        } else {
+            fillerItem = new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1);
+        }
+
         for (int i = 0; i < 54; i++) {
-            if (AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
-                inv.setItem(i, new ItemStack(Material.getMaterial("STAINED_GLASS_PANE"), 1, (byte)15));
-            } else {
-                inv.setItem(i, new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1));
-            }
+            inv.setItem(i, fillerItem);
         }
 
         GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
@@ -193,7 +193,6 @@ public class GameSetup {
 
             // Create player head
             ItemStack playerItem;
-            // FIXED: Handle 1.21 Player Head item
             if (!AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
                 playerItem = new ItemStack(Material.PLAYER_HEAD, 1);
                 SkullMeta skullMeta = (SkullMeta) playerItem.getItemMeta();
@@ -258,6 +257,9 @@ public class GameSetup {
         String title = event.getView().getTitle();
         Player player = (Player) event.getWhoClicked();
         int slot = event.getSlot();
+
+        // Always cancel the click to prevent item taking
+        event.setCancelled(true);
 
         // Main game setup UI
         if (title.equals("§6AllAchievements §7- §eGame Setup")) {
@@ -326,6 +328,7 @@ public class GameSetup {
             // Reset all players button
             else if (slot == 8) {
                 gameModeManager.getActivePlayers().clear();
+                gameModeManager.saveConfig(); // Save the changes to persist them
                 player.sendMessage("§7-------- §6AllAchievements§7 ----------");
                 player.sendMessage("§cAll players have been removed from the game.");
                 player.sendMessage("§7--------------------------------");
@@ -339,48 +342,64 @@ public class GameSetup {
                 int currentPage = 0;
                 if (event.getInventory().getItem(49) != null) {
                     String pageText = event.getInventory().getItem(49).getItemMeta().getDisplayName();
-                    currentPage = Integer.parseInt(pageText.split(" ")[1]) - 1;
-                }
+                    String[] parts = pageText.split(" ");
+                    currentPage = Integer.parseInt(parts[1]) - 1; // Convert from 1-based to 0-based
 
-                // Navigate to new page
-                int newPage = slot == 45 ? currentPage - 1 : currentPage + 1;
-                showPlayerManagementUI(player, newPage);
+                    // Get total pages
+                    int totalPages = Integer.parseInt(parts[3]);
+
+                    // Navigate to new page with bounds checking
+                    int newPage;
+                    if (slot == 45) {
+                        // Previous page
+                        newPage = Math.max(0, currentPage - 1);
+                    } else {
+                        // Next page
+                        newPage = Math.min(totalPages - 1, currentPage + 1);
+                    }
+
+                    showPlayerManagementUI(player, newPage);
+                }
             }
-            // Player selection
+            // Player selection (slots 9-44)
             else if (slot >= 9 && slot < 45) {
                 ItemStack clickedItem = event.getCurrentItem();
                 if (clickedItem != null && clickedItem.hasItemMeta() && clickedItem.getItemMeta().hasDisplayName()) {
                     String playerName = clickedItem.getItemMeta().getDisplayName();
-                    playerName = playerName.substring(2); // Remove color code
+                    if (playerName.startsWith("§a") || playerName.startsWith("§c")) {
+                        playerName = playerName.substring(2); // Remove color code
 
-                    Player targetPlayer = Bukkit.getPlayer(playerName);
-                    if (targetPlayer != null) {
-                        UUID targetId = targetPlayer.getUniqueId();
-                        boolean isActive = gameModeManager.isPlayerActive(targetId);
+                        Player targetPlayer = Bukkit.getPlayer(playerName);
+                        if (targetPlayer != null) {
+                            UUID targetId = targetPlayer.getUniqueId();
+                            boolean isActive = gameModeManager.isPlayerActive(targetId);
 
-                        if (isActive) {
-                            // Remove player
-                            gameModeManager.removePlayer(targetId);
-                            player.sendMessage("§7-------- §6AllAchievements§7 ----------");
-                            player.sendMessage("§cRemoved " + targetPlayer.getName() + " from the game.");
-                            player.sendMessage("§7--------------------------------");
-                        } else {
-                            // Add player
-                            gameModeManager.addPlayer(targetId);
-                            player.sendMessage("§7-------- §6AllAchievements§7 ----------");
-                            player.sendMessage("§aAdded " + targetPlayer.getName() + " to the game.");
-                            player.sendMessage("§7--------------------------------");
+                            // Toggle player's active status
+                            if (isActive) {
+                                // Remove player
+                                gameModeManager.removePlayer(targetId);
+                                player.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                                player.sendMessage("§cRemoved " + targetPlayer.getName() + " from the game.");
+                                player.sendMessage("§7--------------------------------");
+                            } else {
+                                // Add player
+                                gameModeManager.addPlayer(targetId);
+                                player.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                                player.sendMessage("§aAdded " + targetPlayer.getName() + " to the game.");
+                                player.sendMessage("§7--------------------------------");
+                            }
+
+                            // Get current page
+                            int currentPage = 0;
+                            if (event.getInventory().getItem(49) != null) {
+                                String pageText = event.getInventory().getItem(49).getItemMeta().getDisplayName();
+                                String[] parts = pageText.split(" ");
+                                currentPage = Integer.parseInt(parts[1]) - 1;
+                            }
+
+                            // Update the UI
+                            showPlayerManagementUI(player, currentPage);
                         }
-
-                        // Get current page
-                        int currentPage = 0;
-                        if (event.getInventory().getItem(49) != null) {
-                            String pageText = event.getInventory().getItem(49).getItemMeta().getDisplayName();
-                            currentPage = Integer.parseInt(pageText.split(" ")[1]) - 1;
-                        }
-
-                        // Update the UI
-                        showPlayerManagementUI(player, currentPage);
                     }
                 }
             }
@@ -402,7 +421,7 @@ public class GameSetup {
             return;
         }
 
-        // Set the mode
+        // Set the mode and save configuration
         gameModeManager.setGameMode(mode);
         player.sendMessage("§7-------- §6AllAchievements§7 ----------");
         player.sendMessage("§aGame mode set to " + mode);

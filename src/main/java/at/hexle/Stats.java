@@ -1,5 +1,6 @@
 package at.hexle;
 
+import at.hexle.api.AdvancementInfo;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.advancement.Advancement;
@@ -28,37 +29,62 @@ public class Stats {
             inv.setItem(i, fillerItem);
         }
 
-        // Get the target player's completed advancements and all available advancements
-        UUID playerId = targetPlayer.getUniqueId();
-        List<String> finishedAdvancements = AllAchievements.getInstance().getFinishedAchievements(playerId);
-        List<String> allAdvancements = AllAchievements.getInstance().getAllAchievements();
+        // Get the target player's UUID for achievement checking
+        UUID targetId = targetPlayer.getUniqueId();
 
-        // Setup pagination
-        Pagination<String> pagination = new Pagination<>(45, allAdvancements);
+        // Get a list of all advancement keys that the player has completed
+        List<String> completedAdvancementKeys = AllAchievements.getInstance().getPlayerManager()
+                .getPlayerData(targetId).getCompletedAdvancements();
+
+        // Debug these to console to help troubleshoot
+        Bukkit.getLogger().info("Player " + targetPlayer.getName() + " has completed " +
+                completedAdvancementKeys.size() + " advancements");
+
+        // Get all advancement titles
+        List<String> allAdvancementTitles = AllAchievements.getInstance().getAllAchievements();
+
+        // Set up pagination
+        Pagination<String> pagination = new Pagination<>(45, allAdvancementTitles);
 
         // Validate page number
         int totalPages = pagination.totalPages();
         if (page < 0) page = 0;
         if (page >= totalPages && totalPages > 0) page = totalPages - 1;
 
-        // Get the current page of advancements
-        List<String> pageAdvancements = pagination.getPage(page);
+        // Get the current page
+        List<String> pageItems = pagination.getPage(page);
 
         // Add each advancement to the inventory
         int slot = 0;
-        for (String advancementTitle : pageAdvancements) {
-            ItemStack itemStack;
-
-            // Check if this advancement is completed by the player
+        for (String advancementTitle : pageItems) {
+            // Find if the advancement is completed by matching advancement titles
             boolean isCompleted = false;
-            for (String completedAdv : finishedAdvancements) {
-                if (completedAdv.equals(advancementTitle)) {
+
+            // Get the matching advancement (for title lookup)
+            for (Advancement advancement : AllAchievements.getInstance().getAdvancementList()) {
+                String title = "";
+
+                // Get title based on version
+                if (AllAchievements.getInstance().getVersion().startsWith("v1_19") ||
+                        AllAchievements.getInstance().getVersion().startsWith("v1_20")) {
+                    if (advancement.getDisplay() != null) {
+                        title = advancement.getDisplay().getTitle();
+                    }
+                } else {
+                    AdvancementInfo info = new AdvancementInfo(advancement);
+                    title = info.getTitle();
+                }
+
+                // If title matches and the advancement key is in the completed list
+                if (title.equals(advancementTitle) &&
+                        completedAdvancementKeys.contains(advancement.getKey().toString())) {
                     isCompleted = true;
                     break;
                 }
             }
 
-            // Set appropriate item based on completion status
+            // Create the item based on completion status
+            ItemStack itemStack;
             if (isCompleted) {
                 // Use modern Material names for newer versions
                 if (AllAchievements.getInstance().getVersion().startsWith("v1_12")) {

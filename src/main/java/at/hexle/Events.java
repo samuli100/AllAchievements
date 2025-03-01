@@ -161,10 +161,13 @@ public class Events implements Listener {
     public void onInvClick(InventoryClickEvent event) {
         String title = event.getView().getTitle();
 
+        // Always cancel clicks in custom UIs
+        if (title.contains("§6")) {
+            event.setCancelled(true);
+        }
+
         // Handle clicks in achievement stats UI
         if (title.contains("Achievements")) {
-            event.setCancelled(true);
-
             // Get the player who clicked
             Player player = (Player) event.getWhoClicked();
 
@@ -173,84 +176,91 @@ public class Events implements Listener {
                 return;
             }
 
-            // Get the current page from the inventory item
-            String pageText = event.getInventory().getItem(49).getItemMeta().getDisplayName();
-            // Extract page number from "Page X of Y" format
-            int currentPage = Integer.parseInt(pageText.split(" ")[1]) - 1; // Convert to 0-based
-            int totalPages = Integer.parseInt(pageText.split(" ")[3]);      // Get total pages
+            // Get the current page and total pages from the inventory item
+            if (event.getInventory().getItem(49) != null) {
+                String pageText = event.getInventory().getItem(49).getItemMeta().getDisplayName();
+                String[] parts = pageText.split(" ");
+                int currentPage = Integer.parseInt(parts[1]) - 1; // Convert to 0-based
+                int totalPages = parts.length >= 4 ? Integer.parseInt(parts[3]) : 1;
 
-            // Handle navigation (with bounds checking)
-            if (event.getSlot() == 48 && currentPage > 0) {
-                // Previous page
-                currentPage--;
-            } else if (event.getSlot() == 50 && currentPage < totalPages - 1) {
-                // Next page
-                currentPage++;
-            }
+                // Navigate to the new page with bounds checking
+                if (event.getSlot() == 48 && currentPage > 0) {
+                    // Previous page
+                    currentPage--;
+                } else if (event.getSlot() == 50 && currentPage < totalPages - 1) {
+                    // Next page
+                    currentPage++;
+                }
 
-            // If looking at own stats
-            if (title.equals("§6" + player.getName() + "'s Achievements")) {
-                Stats.showStats(player, player, currentPage);
-            }
-            // If looking at someone else's stats
-            else if (title.contains("'s Achievements")) {
-                String targetName = title.replace("§6", "").replace("'s Achievements", "");
-                Player targetPlayer = Bukkit.getPlayer(targetName);
-                if (targetPlayer != null) {
-                    Stats.showStats(player, targetPlayer, currentPage);
-                } else {
-                    player.closeInventory();
-                    player.sendMessage("§cPlayer is no longer online.");
+                // If looking at own stats
+                if (title.equals("§6" + player.getName() + "'s Achievements")) {
+                    Stats.showStats(player, player, currentPage);
+                }
+                // If looking at someone else's stats
+                else if (title.contains("'s Achievements")) {
+                    String targetName = title.replace("§6", "").replace("'s Achievements", "");
+                    Player targetPlayer = Bukkit.getPlayer(targetName);
+                    if (targetPlayer != null) {
+                        Stats.showStats(player, targetPlayer, currentPage);
+                    } else {
+                        player.closeInventory();
+                        player.sendMessage("§cPlayer is no longer online.");
+                    }
                 }
             }
         }
         // Handle clicks in leaderboard UI
-        else if(title.equals("§6Achievement Leaderboard")) {
-            event.setCancelled(true);
-
+        else if (title.equals("§6Achievement Leaderboard")) {
             // Get the player who clicked
             Player player = (Player) event.getWhoClicked();
 
-            // Skip if not clicking navigation buttons or player heads
-            if(event.getSlot() == 48 || event.getSlot() == 50) {
-                // Get the current page
-                String pageText = event.getInventory().getItem(49).getItemMeta().getDisplayName();
-                int page = Integer.parseInt(pageText.split(" ")[1]) - 1; // Convert from 1-based to 0-based
+            // Navigation buttons
+            if (event.getSlot() == 48 || event.getSlot() == 50) {
+                // Get the current page and total pages
+                if (event.getInventory().getItem(49) != null) {
+                    String pageText = event.getInventory().getItem(49).getItemMeta().getDisplayName();
+                    String[] parts = pageText.split(" ");
+                    int currentPage = Integer.parseInt(parts[1]) - 1; // Convert from 1-based to 0-based
+                    int totalPages = Integer.parseInt(parts[3]);
 
-                // Handle navigation
-                if(event.getSlot() == 48) {
-                    page--;
-                } else if(event.getSlot() == 50) {
-                    page++;
+                    // Navigate to the new page with bounds checking
+                    if (event.getSlot() == 48 && currentPage > 0) {
+                        // Previous page
+                        currentPage--;
+                    } else if (event.getSlot() == 50 && currentPage < totalPages - 1) {
+                        // Next page
+                        currentPage++;
+                    }
+
+                    // Show updated leaderboard
+                    Leaderboard.showLeaderboard(player, currentPage);
                 }
-
-                // Show updated leaderboard
-                Leaderboard.showLeaderboard(player, page);
             }
-            // If clicking on a player's entry, show their stats
-            else if(event.getCurrentItem() != null &&
+            // Clicking on a player entry to view their stats
+            else if (event.getCurrentItem() != null &&
                     (event.getCurrentItem().getType().name().contains("PLAYER_HEAD") ||
                             (AllAchievements.getInstance().getVersion().startsWith("v1_12") &&
                                     event.getCurrentItem().getType().name().equals("PAPER")))) {
 
                 // Extract player name from the item
                 String displayName = event.getCurrentItem().getItemMeta().getDisplayName();
-                String playerName = displayName.substring(displayName.indexOf(" ") + 1); // Remove rank prefix
+                if (displayName != null && displayName.contains(" ")) {
+                    String playerName = displayName.substring(displayName.indexOf(" ") + 1); // Remove rank prefix
 
-                // Find the player and show their stats
-                Player targetPlayer = Bukkit.getPlayer(playerName);
-                if(targetPlayer != null) {
-                    Stats.showStats(player, targetPlayer, 0);
-                } else {
-                    player.sendMessage("§cPlayer " + playerName + " is not online.");
+                    // Find the player and show their stats
+                    Player targetPlayer = Bukkit.getPlayer(playerName);
+                    if (targetPlayer != null) {
+                        Stats.showStats(player, targetPlayer, 0);
+                    } else {
+                        player.sendMessage("§cPlayer " + playerName + " is not online.");
+                    }
                 }
             }
         }
-        // Handle clicks in game setup UI
-        else if(title.equals("§6AllAchievements §7- §eGame Setup")) {
-            event.setCancelled(true);
-
-            // Game setup clicks are handled in the GameSetup class
+        // Handle clicks in game setup and player management UIs
+        else if (title.equals("§6AllAchievements §7- §eGame Setup") ||
+                title.equals("§6AllAchievements §7- §ePlayer Management")) {
+            // Delegate handling to the GameSetup class
             GameSetup.handleInventoryClick(event);
         }
     }
