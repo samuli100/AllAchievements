@@ -11,7 +11,7 @@ import java.util.List;
 public class Stats {
 
     public static void showStats(Player player, Player targetPlayer, int page){
-        Inventory inv = Bukkit.createInventory(null, 54, "§6AllAchievements");
+        Inventory inv = Bukkit.createInventory(null, 54, "§6" + targetPlayer.getName() + "'s Achievements");
 
         // Fill the inventory with black glass panes
         ItemStack fillerItem;
@@ -25,7 +25,8 @@ public class Stats {
             inv.setItem(i, fillerItem);
         }
 
-        List<String> finishedAdvancements = AllAchievements.getInstance().getFinishedAchievements();
+        // Get the target player's completed advancements
+        List<String> finishedAdvancements = AllAchievements.getInstance().getFinishedAchievements(targetPlayer.getUniqueId());
         Pagination<String> pagination = new Pagination<>(45, AllAchievements.getInstance().getAllAchievements());
 
         if(page < 0) page = 0;
@@ -73,7 +74,7 @@ public class Stats {
             pageIndicator = new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1);
         }
         ItemMeta indicatorMeta = pageIndicator.getItemMeta();
-        indicatorMeta.setDisplayName("§6Page " + page);
+        indicatorMeta.setDisplayName("§6Page " + (page + 1));
         pageIndicator.setItemMeta(indicatorMeta);
         inv.setItem(49, pageIndicator);
 
