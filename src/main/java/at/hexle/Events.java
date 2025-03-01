@@ -153,6 +153,8 @@ public class Events implements Listener {
         }
     }
 
+    // Fix for the inventory click event handler in Stats section:
+
     @EventHandler
     public void onInvClick(InventoryClickEvent event){
         String title = event.getView().getTitle();
@@ -171,7 +173,7 @@ public class Events implements Listener {
 
             // Get the current page from the inventory item
             String pageText = event.getInventory().getItem(49).getItemMeta().getDisplayName();
-            int page = Integer.parseInt(pageText.split(" ")[1]) - 1; // Convert from 1-based to 0-based
+            int page = Integer.parseInt(pageText.split(" ")[1]);
 
             // Handle navigation
             if(event.getSlot() == 48){
@@ -182,7 +184,7 @@ public class Events implements Listener {
 
             // If looking at own stats
             if(title.equals("§6" + player.getName() + "'s Achievements")) {
-                Stats.showStats(player, targetPlayer, page);
+                Stats.showStats(player, player, page);
             }
             // If looking at someone else's stats
             else if(title.contains("'s Achievements")) {
@@ -196,6 +198,7 @@ public class Events implements Listener {
                 }
             }
         }
+
         // Handle clicks in leaderboard UI
         else if(title.equals("§6Achievement Leaderboard")) {
             event.setCancelled(true);

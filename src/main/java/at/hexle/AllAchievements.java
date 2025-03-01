@@ -47,16 +47,7 @@ public class AllAchievements extends JavaPlugin implements Listener {
         // Initialize game mode manager
         gameModeManager = new GameModeManager(this);
 
-        Bukkit.getConsoleSender().sendMessage("------------------------------------------------------");
-        Bukkit.getConsoleSender().sendMessage("");
-        Bukkit.getConsoleSender().sendMessage("._   _   _____  __  __  _       _____");
-        Bukkit.getConsoleSender().sendMessage("| | | | | ____| \\ \\/ / | |     | ____|                         ");
-        Bukkit.getConsoleSender().sendMessage("| |_| | |  _|    \\  /  | |     |  _|                           ");
-        Bukkit.getConsoleSender().sendMessage("|  _  | | |___   /  \\  | |___  | |___");
-        Bukkit.getConsoleSender().sendMessage("|_| |_| |_____| /_/\\_\\ |_____| |_____|");
-        Bukkit.getConsoleSender().sendMessage("");
-        Bukkit.getConsoleSender().sendMessage("Hexle_Development_Systems - https://hexle.at");
-        Bukkit.getConsoleSender().sendMessage("");
+        Bukkit.getConsoleSender().sendMessage("AllAchievements");
         if(!version.startsWith("v1_20")
                 && !version.startsWith("v1_19")
                 && !version.startsWith("v1_18")
@@ -79,6 +70,7 @@ public class AllAchievements extends JavaPlugin implements Listener {
 
         Bukkit.getPluginManager().registerEvents(new Events(), this);
 
+        Leaderboard.init();
         // Timer task - now updates player-specific timers
         Bukkit.getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
             @Override
