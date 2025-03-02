@@ -10,9 +10,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -31,6 +34,26 @@ import java.util.UUID;
  * Handles the backpack feature
  */
 public class Backpack implements Listener {
+
+    /**
+     * Custom inventory holder for backpack inventories
+     */
+    public class BackpackHolder implements InventoryHolder {
+        private final String backpackId;
+
+        public BackpackHolder(String backpackId) {
+            this.backpackId = backpackId;
+        }
+
+        public String getBackpackId() {
+            return backpackId;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return null; // This is just for implementation, actual inventory is stored elsewhere
+        }
+    }
 
     private final AllAchievements plugin;
     private final File backpackFolder;
@@ -66,12 +89,11 @@ public class Backpack implements Listener {
         ShapedRecipe recipe = new ShapedRecipe(recipeKey, backpack);
 
         // Define the shape
-        recipe.shape("SLS", "CCC", "LLL");
+        recipe.shape("LLL", "LCL", "LLL");
 
         // Define the ingredients
         recipe.setIngredient('L', Material.LEATHER);
         recipe.setIngredient('C', Material.CHEST);
-        recipe.setIngredient('S', Material.STRING);
 
         // Register the recipe
         Bukkit.addRecipe(recipe);
@@ -140,8 +162,11 @@ public class Backpack implements Listener {
         // Open the inventory for the player
         player.openInventory(backpackInventory);
 
-        // Store reference to the open backpack
+        // Store reference to the open backpack with its ID
         openBackpacks.put(player.getUniqueId(), backpackInventory);
+
+        // Store the backpack ID in the player's metadata
+        player.setMetadata("backpack_id", new org.bukkit.metadata.FixedMetadataValue(plugin, backpackId));
     }
 
     /**
@@ -149,7 +174,10 @@ public class Backpack implements Listener {
      */
     private Inventory loadBackpack(String backpackId) {
         File backpackFile = new File(backpackFolder, backpackId + ".yml");
-        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.GOLD + "Backpack");
+
+        // Create a custom inventory holder with the backpack ID
+        BackpackHolder holder = new BackpackHolder(backpackId);
+        Inventory inventory = Bukkit.createInventory(holder, 54, ChatColor.GOLD + "Backpack");
 
         if (backpackFile.exists()) {
             FileConfiguration config = YamlConfiguration.loadConfiguration(backpackFile);
@@ -201,14 +229,29 @@ public class Backpack implements Listener {
         ItemStack item = event.getItem();
 
         // Check if the player is right-clicking with a backpack
-        if ((event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) && isBackpack(item)) {
-            event.setCancelled(true);
+        if ((event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) && item != null) {
+            // Verify this is a backpack
+            if (isBackpack(item)) {
+                // Cancel the default interaction (especially important for bundles)
+                event.setCancelled(true);
 
-            // Get the backpack ID
-            String backpackId = getBackpackId(item);
-            if (backpackId != null) {
-                // Open the backpack
-                openBackpack(player, backpackId);
+                // Get the backpack ID
+                String backpackId = getBackpackId(item);
+                if (backpackId != null) {
+                    // Make sure the player actually has this item (anti-cheat check)
+                    boolean hasItem = false;
+                    for (ItemStack invItem : player.getInventory().getContents()) {
+                        if (invItem != null && invItem.equals(item)) {
+                            hasItem = true;
+                            break;
+                        }
+                    }
+
+                    if (hasItem) {
+                        // Open the backpack
+                        openBackpack(player, backpackId);
+                    }
+                }
             }
         }
     }
@@ -231,25 +274,62 @@ public class Backpack implements Listener {
 
             // Make sure it's the same inventory being closed
             if (event.getInventory().equals(backpackInventory)) {
-                // Find the backpack item in the player's inventory to get its ID
-                ItemStack backpackItem = null;
-                for (ItemStack item : player.getInventory().getContents()) {
-                    if (item != null && isBackpack(item)) {
-                        backpackItem = item;
-                        break;
-                    }
-                }
+                // Get the backpack ID from player metadata
+                if (player.hasMetadata("backpack_id")) {
+                    String backpackId = player.getMetadata("backpack_id").get(0).asString();
 
-                if (backpackItem != null) {
-                    String backpackId = getBackpackId(backpackItem);
-                    if (backpackId != null) {
-                        // Save the backpack contents
-                        saveBackpack(backpackId, backpackInventory);
-                    }
+                    // Save the backpack contents
+                    saveBackpack(backpackId, backpackInventory);
+
+                    // Remove metadata
+                    player.removeMetadata("backpack_id", plugin);
                 }
 
                 // Remove from open backpacks map
                 openBackpacks.remove(playerId);
+            }
+        }
+    }
+
+    /**
+     * Handle inventory click events to prevent nesting backpacks
+     */
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent event) {
+        // Check if this is a backpack inventory
+        if (event.getInventory().getHolder() instanceof BackpackHolder) {
+            // Check if player is trying to put a backpack inside a backpack
+            ItemStack clickedItem = event.getCurrentItem();
+            ItemStack cursorItem = event.getCursor();
+
+            // Prevent putting backpacks inside backpacks
+            if ((clickedItem != null && isBackpack(clickedItem)) ||
+                    (cursorItem != null && isBackpack(cursorItem))) {
+                event.setCancelled(true);
+                if (event.getWhoClicked() instanceof Player) {
+                    Player player = (Player) event.getWhoClicked();
+                    player.sendMessage(ChatColor.RED + "You cannot put a backpack inside another backpack!");
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle inventory drag events
+     */
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent event) {
+        // Check if this is a backpack inventory
+        if (event.getInventory().getHolder() instanceof BackpackHolder) {
+            // Check if player is trying to drag a backpack into a backpack
+            ItemStack draggedItem = event.getOldCursor();
+
+            if (draggedItem != null && isBackpack(draggedItem)) {
+                event.setCancelled(true);
+                if (event.getWhoClicked() instanceof Player) {
+                    Player player = (Player) event.getWhoClicked();
+                    player.sendMessage(ChatColor.RED + "You cannot put a backpack inside another backpack!");
+                }
             }
         }
     }
