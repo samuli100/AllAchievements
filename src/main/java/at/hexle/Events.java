@@ -3,38 +3,92 @@ package at.hexle;
 import at.hexle.api.AdvancementInfo;
 import org.bukkit.Bukkit;
 import org.bukkit.advancement.Advancement;
+import org.bukkit.advancement.AdvancementProgress;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class Events implements Listener {
 
-    @EventHandler
+    // Static instance for access from other classes
+    private static Events instance;
+
+    // Map to track if players have been notified about paused state (to prevent spam)
+    private Map<UUID, Boolean> pauseNotified = new HashMap<>();
+
+    // Map to track advancements earned during pause (to be revoked)
+    private Map<UUID, String> pausedAdvancements = new HashMap<>();
+
+    // Constructor to set the instance
+    public Events() {
+        instance = this;
+    }
+
+    // Static getter for the instance
+    public static Events getInstance() {
+        return instance;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onAchievement(PlayerAdvancementDoneEvent event){
         // Get the player and advancement
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId();
         Advancement advancement = event.getAdvancement();
 
-        // Check if game is paused - skip all achievement processing if so
+        // Check if game is paused
         GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
         if (gameModeManager.isGamePaused()) {
-            // Log and ignore advancements during pause
-            Bukkit.getLogger().info("Advancement " + advancement.getKey() +
-                    " by " + player.getName() + " ignored because game is paused");
-            return;
+            // Only act if player is part of an active game
+            if (gameModeManager.isPlayerActive(playerId) ||
+                    (gameModeManager.getGameMode() == GameModeManager.GameMode.SOLO &&
+                            AllAchievements.getInstance().getPlayerManager().getPlayerData(playerId).isTimerRunning())) {
+
+                // We can't cancel the event, but we can schedule a task to revoke the advancement
+                // Store the advancement key for later revocation
+                pausedAdvancements.put(playerId, advancement.getKey().toString());
+
+                // Schedule the revocation task (1 tick delay to ensure it happens after the event)
+                Bukkit.getScheduler().runTaskLater(AllAchievements.getInstance(), () -> {
+                    try {
+                        // Get the advancement progress
+                        AdvancementProgress progress = player.getAdvancementProgress(advancement);
+
+                        // Revoke all criteria that were just awarded
+                        for (String criteria : progress.getAwardedCriteria()) {
+                            progress.revokeCriteria(criteria);
+                        }
+
+                        // Log and notify player
+                        Bukkit.getLogger().info("Revoked advancement " + advancement.getKey() +
+                                " from " + player.getName() + " because game is paused");
+
+                        // Notify player (only once per session to avoid spam)
+                        notifyPausedState(player);
+
+                    } catch (Exception e) {
+                        Bukkit.getLogger().warning("Failed to revoke paused advancement: " + e.getMessage());
+                    }
+                }, 1L);
+
+                // Don't process this advancement any further
+                return;
+            }
         }
 
         // Check if this is a valid advancement we should track
         boolean isValidAdvancement = false;
-        // FIXED: Add 1.21 to the version check
+        // Handle 1.19-1.21 versions
         if(AllAchievements.getInstance().getVersion().startsWith("v1_19") ||
                 AllAchievements.getInstance().getVersion().startsWith("v1_20") ||
                 AllAchievements.getInstance().getVersion().startsWith("v1_21")) {
@@ -164,6 +218,29 @@ public class Events implements Listener {
         }
     }
 
+    /**
+     * Notify a player that the game is paused (only once per session)
+     */
+    private void notifyPausedState(Player player) {
+        UUID playerId = player.getUniqueId();
+        if (!pauseNotified.getOrDefault(playerId, false)) {
+            player.sendMessage("§7------- §6AllAchievements§7 ---------");
+            player.sendMessage("§c§lAchievements are currently paused!");
+            player.sendMessage("§cAdvancements will not be counted while the game is paused.");
+            player.sendMessage("§7------------------------------");
+
+            pauseNotified.put(playerId, true);
+        }
+    }
+
+    /**
+     * Reset notification status when game is resumed
+     */
+    public void resetPauseNotifications() {
+        pauseNotified.clear();
+        pausedAdvancements.clear();
+    }
+
     @EventHandler
     public void onInvClick(InventoryClickEvent event) {
         String title = event.getView().getTitle();
@@ -290,5 +367,9 @@ public class Events implements Listener {
 
         // Save player data when they leave
         AllAchievements.getInstance().getPlayerManager().savePlayerData(playerId);
+
+        // Remove from notification maps
+        pauseNotified.remove(playerId);
+        pausedAdvancements.remove(playerId);
     }
 }

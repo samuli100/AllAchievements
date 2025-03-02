@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 
 import java.io.File;
 import java.io.IOException;
@@ -194,6 +195,14 @@ public class GameModeManager {
         }
 
         gamePaused = !gamePaused;
+
+        // Reset notification status when game is resumed
+        if (!gamePaused) {
+            // Access the Events instance using the static getter
+            if (Events.getInstance() != null) {
+                Events.getInstance().resetPauseNotifications();
+            }
+        }
 
         // Toggle timers for all active players based on game mode
         if (currentGameMode != GameMode.SOLO) {

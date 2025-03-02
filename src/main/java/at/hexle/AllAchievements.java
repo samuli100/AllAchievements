@@ -71,7 +71,8 @@ public class AllAchievements extends JavaPlugin implements Listener {
         this.getCommand("av").setExecutor(new Commands());
         this.getCommand("av").setTabCompleter(new TabCompleter());
 
-        Bukkit.getPluginManager().registerEvents(new Events(), this);
+        Events eventsListener = new Events();
+        Bukkit.getPluginManager().registerEvents(eventsListener, this);
         // Timer task - now updates player-specific timers
         Bukkit.getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
             @Override
