@@ -164,7 +164,6 @@ public class Events implements Listener {
         }
     }
 
-    // Keep the rest of the Events class the same
     @EventHandler
     public void onInvClick(InventoryClickEvent event) {
         String title = event.getView().getTitle();
@@ -172,6 +171,14 @@ public class Events implements Listener {
         // Always cancel clicks in custom UIs
         if (title.contains("§6")) {
             event.setCancelled(true);
+        }
+
+        // Handle clicks in game setup and player management UIs
+        if (title.equals("§6AllAchievements §7- §eGame Setup") ||
+                title.equals("§6AllAchievements §7- §ePlayer Management")) {
+            // Delegate handling to the GameSetup class
+            GameSetup.handleInventoryClick(event);
+            return; // Important to return here to prevent further processing
         }
 
         // Handle clicks in achievement stats UI
@@ -264,12 +271,6 @@ public class Events implements Listener {
                     }
                 }
             }
-        }
-        // Handle clicks in game setup and player management UIs
-        else if (title.equals("§6AllAchievements §7- §eGame Setup") ||
-                title.equals("§6AllAchievements §7- §ePlayer Management")) {
-            // Delegate handling to the GameSetup class
-            GameSetup.handleInventoryClick(event);
         }
     }
 

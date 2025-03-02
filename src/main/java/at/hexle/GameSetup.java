@@ -23,7 +23,7 @@ public class GameSetup {
      * Shows the main game setup UI with improved visual elements
      */
     public static void showSetupUI(Player player) {
-        Inventory inv = Bukkit.createInventory(null, 36, "§6§lAllAchievements §8- §eSetup");
+        Inventory inv = Bukkit.createInventory(null, 36, "§6AllAchievements §7- §eGame Setup");
 
         // Fill with glass
         ItemStack fillerItem = createGlassPane();
@@ -215,7 +215,7 @@ public class GameSetup {
      * Shows the player management UI with improved visual feedback
      */
     public static void showPlayerManagementUI(Player admin, int page) {
-        Inventory inv = Bukkit.createInventory(null, 54, "§d§lManage Players");
+        Inventory inv = Bukkit.createInventory(null, 54, "§6AllAchievements §7- §ePlayer Management");
 
         // Fill with glass
         ItemStack fillerItem = createGlassPane();
@@ -337,7 +337,7 @@ public class GameSetup {
         event.setCancelled(true);
 
         // Main game setup UI
-        if (title.equals("§6§lAllAchievements §8- §eSetup")) {
+        if (title.equals("§6AllAchievements §7- §eGame Setup")) {
             // Game mode selection
             if (slot == 11) { // Solo mode
                 setGameMode(player, GameModeManager.GameMode.SOLO);
@@ -425,7 +425,7 @@ public class GameSetup {
             }
         }
         // Player management UI
-        else if (title.equals("§d§lManage Players")) {
+        else if (title.equals("§6AllAchievements §7- §ePlayer Management")) {
             GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
 
             // Back button
