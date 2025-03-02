@@ -12,7 +12,7 @@ description: Track all advancements in your Minecraft server
 commands:
   av:
     description: Main command for AllAchievements plugin
-    usage: /<command> [start|pause|reset|stats]
+    usage: /<command> [start|pause|reset|stats|backpack]
     permission: av.command
 
 permissions:
@@ -31,3 +31,9 @@ permissions:
   av.stats:
     description: Allows viewing achievement statistics
     default: true
+  av.admin:
+    description: Allows using admin commands
+    default: op
+  av.backpack:
+    description: Allows using backpack commands
+    default: op

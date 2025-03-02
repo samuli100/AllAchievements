@@ -25,6 +25,7 @@ public class AllAchievements extends JavaPlugin implements Listener {
 
     // Game mode manager for coop/versus modes
     private GameModeManager gameModeManager;
+    private Backpack backpackManager;
 
     private static AllAchievements instance;
 
@@ -46,6 +47,10 @@ public class AllAchievements extends JavaPlugin implements Listener {
 
         // Initialize game mode manager
         gameModeManager = new GameModeManager(this);
+
+        // Initialize backpack manager
+        backpackManager = new Backpack(this);
+        Bukkit.getPluginManager().registerEvents(backpackManager, this);
 
         Bukkit.getConsoleSender().sendMessage("AllAchievements");
         // FIXED: Add 1.21 to the supported versions list and reverse the logic
@@ -73,6 +78,7 @@ public class AllAchievements extends JavaPlugin implements Listener {
 
         Events eventsListener = new Events();
         Bukkit.getPluginManager().registerEvents(eventsListener, this);
+
         // Timer task - now updates player-specific timers
         Bukkit.getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
             @Override
@@ -174,6 +180,10 @@ public class AllAchievements extends JavaPlugin implements Listener {
             }
         }
         return allStrings;
+    }
+
+    public Backpack getBackpackManager() {
+        return backpackManager;
     }
 
     // Start timer for a specific player

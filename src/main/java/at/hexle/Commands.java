@@ -5,6 +5,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -358,6 +359,51 @@ public class Commands implements CommandExecutor {
                 }
                 return true;
 
+            case "backpack":
+                if (!sender.hasPermission("av.admin")) {
+                    noPerm(sender);
+                    return true;
+                }
+
+                if (args.length >= 2) {
+                    // Give a backpack to a specific player
+                    Player targetPlayer = Bukkit.getPlayer(args[1]);
+                    if (targetPlayer == null) {
+                        sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                        sender.sendMessage("§cPlayer not found: " + args[1]);
+                        sender.sendMessage("§7--------------------------------");
+                        return true;
+                    }
+
+                    // Create a new backpack and give it to the player
+                    ItemStack backpack = AllAchievements.getInstance().getBackpackManager().createBackpack();
+                    targetPlayer.getInventory().addItem(backpack);
+
+                    sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                    sender.sendMessage("§aGave a backpack to " + targetPlayer.getName());
+                    sender.sendMessage("§7--------------------------------");
+
+                    targetPlayer.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                    targetPlayer.sendMessage("§aYou received a backpack!");
+                    targetPlayer.sendMessage("§6Right-click to open it");
+                    targetPlayer.sendMessage("§7--------------------------------");
+                } else if (sender instanceof Player) {
+                    // Give a backpack to the sender
+                    Player player = (Player) sender;
+                    ItemStack backpack = AllAchievements.getInstance().getBackpackManager().createBackpack();
+                    player.getInventory().addItem(backpack);
+
+                    sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                    sender.sendMessage("§aYou received a backpack!");
+                    sender.sendMessage("§6Right-click to open it");
+                    sender.sendMessage("§7--------------------------------");
+                } else {
+                    sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                    sender.sendMessage("§cUsage: /av backpack [player]");
+                    sender.sendMessage("§7--------------------------------");
+                }
+                return true;
+
             default:
                 // Unknown command
                 sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
@@ -365,6 +411,9 @@ public class Commands implements CommandExecutor {
                 sender.sendMessage("§7Type /av for help.");
                 sender.sendMessage("§7--------------------------------");
                 return true;
+
+
+
         }
     }
 
