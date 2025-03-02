@@ -2,6 +2,7 @@ package at.hexle;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
@@ -14,63 +15,88 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Handles the game setup UI for configuring Solo, Coop, and Versus modes
+ * Enhanced UI for game setup and configuration for Minecraft 1.21
  */
 public class GameSetup {
 
     /**
-     * Shows the main game setup UI
+     * Shows the main game setup UI with improved visual elements
      */
     public static void showSetupUI(Player player) {
-        Inventory inv = Bukkit.createInventory(null, 27, "§6AllAchievements §7- §eGame Setup");
+        Inventory inv = Bukkit.createInventory(null, 36, "§6§lAllAchievements §8- §eSetup");
 
         // Fill with glass
-        ItemStack fillerItem;
-        if (AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
-            fillerItem = new ItemStack(Material.getMaterial("STAINED_GLASS_PANE"), 1, (byte)15);
-        } else {
-            fillerItem = new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1);
-        }
-
-        for (int i = 0; i < 27; i++) {
+        ItemStack fillerItem = createGlassPane();
+        for (int i = 0; i < 36; i++) {
             inv.setItem(i, fillerItem);
         }
 
         GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
         GameModeManager.GameMode currentMode = gameModeManager.getGameMode();
 
+        // Title item at the top center
+        ItemStack titleItem = new ItemStack(Material.BOOK, 1);
+        ItemMeta titleMeta = titleItem.getItemMeta();
+        titleMeta.setDisplayName("§6§lGame Setup");
+        List<String> titleLore = new ArrayList<>();
+        titleLore.add("§7Configure your achievement challenge");
+        titleLore.add("§7Current game status: " +
+                (gameModeManager.isGameActive() ? "§aActive" : "§cInactive"));
+        if (gameModeManager.isGamePaused()) {
+            titleLore.add("§e§lGame is currently PAUSED");
+        }
+        titleMeta.setLore(titleLore);
+        titleItem.setItemMeta(titleMeta);
+        inv.setItem(4, titleItem);
+
         // Solo mode item
-        ItemStack soloItem = createModeItem(Material.DIAMOND_SWORD, "§eSolo Mode",
+        boolean soloSelected = currentMode == GameModeManager.GameMode.SOLO;
+        ItemStack soloItem = createModeItem(
+                soloSelected ? Material.DIAMOND_HELMET : Material.DIAMOND_SWORD,
+                "§e§lSolo Mode" + (soloSelected ? " §a✓" : ""),
                 "§7Each player works on their own advancements",
                 "§7independently from other players.",
                 "",
-                currentMode == GameModeManager.GameMode.SOLO ? "§a§lCURRENTLY SELECTED" : "§7Click to select");
-        inv.setItem(10, soloItem);
+                soloSelected ? "§a§lCURRENTLY SELECTED" : "§7Click to select"
+        );
+        inv.setItem(11, soloItem);
 
         // Coop mode item
-        ItemStack coopItem = createModeItem(Material.GOLDEN_APPLE, "§aCoop Mode",
+        boolean coopSelected = currentMode == GameModeManager.GameMode.COOP;
+        ItemStack coopItem = createModeItem(
+                coopSelected ? Material.GOLDEN_HELMET : Material.GOLDEN_APPLE,
+                "§a§lCoop Mode" + (coopSelected ? " §a✓" : ""),
                 "§7Players work together to complete advancements.",
                 "§7When one player gets an advancement,",
                 "§7all team members receive credit for it.",
                 "",
-                currentMode == GameModeManager.GameMode.COOP ? "§a§lCURRENTLY SELECTED" : "§7Click to select");
+                coopSelected ? "§a§lCURRENTLY SELECTED" : "§7Click to select"
+        );
         inv.setItem(13, coopItem);
 
         // Versus mode item
-        ItemStack versusItem = createModeItem(Material.BOW, "§cVersus Mode",
+        boolean versusSelected = currentMode == GameModeManager.GameMode.VERSUS;
+        ItemStack versusItem = createModeItem(
+                versusSelected ? Material.IRON_HELMET : Material.BOW,
+                "§c§lVersus Mode" + (versusSelected ? " §a✓" : ""),
                 "§7Players compete to complete all advancements",
                 "§7first. The first to finish wins the challenge!",
                 "",
-                currentMode == GameModeManager.GameMode.VERSUS ? "§a§lCURRENTLY SELECTED" : "§7Click to select");
-        inv.setItem(16, versusItem);
+                versusSelected ? "§a§lCURRENTLY SELECTED" : "§7Click to select"
+        );
+        inv.setItem(15, versusItem);
 
         // Player management button
-        ItemStack playersItem = new ItemStack(Material.BOOK, 1);
+        ItemStack playersItem = new ItemStack(Material.PLAYER_HEAD, 1);
         ItemMeta playersMeta = playersItem.getItemMeta();
-        playersMeta.setDisplayName("§6Manage Players");
+        playersMeta.setDisplayName("§d§lManage Players");
         List<String> playersLore = new ArrayList<>();
         playersLore.add("§7Add or remove players from the game");
+        playersLore.add("");
         playersLore.add("§7Currently active: §e" + gameModeManager.getActivePlayers().size() + " players");
+        if (currentMode != GameModeManager.GameMode.SOLO && gameModeManager.getActivePlayers().isEmpty()) {
+            playersLore.add("§c§lNo players added! Add players to start.");
+        }
         playersMeta.setLore(playersLore);
         playersItem.setItemMeta(playersMeta);
         inv.setItem(22, playersItem);
@@ -80,26 +106,91 @@ public class GameSetup {
         if (gameModeManager.isGameActive()) {
             gameControlItem = new ItemStack(Material.REDSTONE_BLOCK, 1);
             ItemMeta controlMeta = gameControlItem.getItemMeta();
-            controlMeta.setDisplayName("§cStop Game");
+            controlMeta.setDisplayName("§c§lStop Game");
             List<String> controlLore = new ArrayList<>();
             controlLore.add("§7End the current game session");
+            if (gameModeManager.isGamePaused()) {
+                controlLore.add("§e§lGame is currently PAUSED");
+
+                // Add "Resume Game" button when paused
+                ItemStack resumeItem = new ItemStack(Material.EMERALD, 1);
+                ItemMeta resumeMeta = resumeItem.getItemMeta();
+                resumeMeta.setDisplayName("§a§lResume Game");
+                List<String> resumeLore = new ArrayList<>();
+                resumeLore.add("§7Continue the paused game");
+                resumeMeta.setLore(resumeLore);
+                resumeItem.setItemMeta(resumeMeta);
+                inv.setItem(30, resumeItem);
+
+                // Add "Pause Game" button (disabled)
+                ItemStack pauseItem = new ItemStack(Material.GRAY_DYE, 1);
+                ItemMeta pauseMeta = pauseItem.getItemMeta();
+                pauseMeta.setDisplayName("§8§lPause Game");
+                List<String> pauseLore = new ArrayList<>();
+                pauseLore.add("§7Game is already paused");
+                pauseMeta.setLore(pauseLore);
+                pauseItem.setItemMeta(pauseMeta);
+                inv.setItem(32, pauseItem);
+            } else {
+                // Add "Pause Game" button
+                ItemStack pauseItem = new ItemStack(Material.CLOCK, 1);
+                ItemMeta pauseMeta = pauseItem.getItemMeta();
+                pauseMeta.setDisplayName("§e§lPause Game");
+                List<String> pauseLore = new ArrayList<>();
+                pauseLore.add("§7Temporarily pause the game");
+                pauseMeta.setLore(pauseLore);
+                pauseItem.setItemMeta(pauseMeta);
+                inv.setItem(31, pauseItem);
+            }
             controlMeta.setLore(controlLore);
             gameControlItem.setItemMeta(controlMeta);
         } else {
             gameControlItem = new ItemStack(Material.EMERALD_BLOCK, 1);
             ItemMeta controlMeta = gameControlItem.getItemMeta();
-            controlMeta.setDisplayName("§aStart Game");
+            controlMeta.setDisplayName("§a§lStart Game");
             List<String> controlLore = new ArrayList<>();
             controlLore.add("§7Begin a new game with the selected settings");
             if (currentMode != GameModeManager.GameMode.SOLO && gameModeManager.getActivePlayers().isEmpty()) {
                 controlLore.add("§c§lWARNING: No players added to the game!");
+                controlLore.add("§c§lAdd players before starting.");
             }
             controlMeta.setLore(controlLore);
             gameControlItem.setItemMeta(controlMeta);
         }
-        inv.setItem(4, gameControlItem);
+        inv.setItem(31, gameControlItem);
+
+        // Stats button
+        ItemStack statsItem = new ItemStack(Material.PAPER, 1);
+        ItemMeta statsMeta = statsItem.getItemMeta();
+        statsMeta.setDisplayName("§b§lView Stats");
+        List<String> statsLore = new ArrayList<>();
+        statsLore.add("§7Check achievement progress");
+        statsMeta.setLore(statsLore);
+        statsItem.setItemMeta(statsMeta);
+        inv.setItem(27, statsItem);
+
+        // Leaderboard button
+        ItemStack leaderboardItem = new ItemStack(Material.GOLD_INGOT, 1);
+        ItemMeta leaderboardMeta = leaderboardItem.getItemMeta();
+        leaderboardMeta.setDisplayName("§6§lLeaderboard");
+        List<String> leaderboardLore = new ArrayList<>();
+        leaderboardLore.add("§7View top players");
+        leaderboardMeta.setLore(leaderboardLore);
+        leaderboardItem.setItemMeta(leaderboardMeta);
+        inv.setItem(35, leaderboardItem);
 
         player.openInventory(inv);
+    }
+
+    /**
+     * Create a glass pane for UI background
+     */
+    private static ItemStack createGlassPane() {
+        ItemStack fillerItem = new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1);
+        ItemMeta meta = fillerItem.getItemMeta();
+        meta.setDisplayName(" ");
+        fillerItem.setItemMeta(meta);
+        return fillerItem;
     }
 
     /**
@@ -121,19 +212,13 @@ public class GameSetup {
     }
 
     /**
-     * Shows the player management UI
+     * Shows the player management UI with improved visual feedback
      */
     public static void showPlayerManagementUI(Player admin, int page) {
-        Inventory inv = Bukkit.createInventory(null, 54, "§6AllAchievements §7- §ePlayer Management");
+        Inventory inv = Bukkit.createInventory(null, 54, "§d§lManage Players");
 
         // Fill with glass
-        ItemStack fillerItem;
-        if (AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
-            fillerItem = new ItemStack(Material.getMaterial("STAINED_GLASS_PANE"), 1, (byte)15);
-        } else {
-            fillerItem = new ItemStack(Material.BLACK_STAINED_GLASS_PANE, 1);
-        }
-
+        ItemStack fillerItem = createGlassPane();
         for (int i = 0; i < 54; i++) {
             inv.setItem(i, fillerItem);
         }
@@ -143,11 +228,12 @@ public class GameSetup {
         // Title item
         ItemStack titleItem = new ItemStack(Material.BOOK, 1);
         ItemMeta titleMeta = titleItem.getItemMeta();
-        titleMeta.setDisplayName("§6Manage Game Players");
+        titleMeta.setDisplayName("§d§lManage Game Players");
 
         List<String> titleLore = new ArrayList<>();
         titleLore.add("§7Click on players to toggle their participation");
         titleLore.add("§7Current game mode: §e" + gameModeManager.getGameMode().name());
+        titleLore.add("§7Active players: §e" + gameModeManager.getActivePlayers().size());
         titleMeta.setLore(titleLore);
         titleItem.setItemMeta(titleMeta);
         inv.setItem(4, titleItem);
@@ -155,14 +241,14 @@ public class GameSetup {
         // Back button
         ItemStack backItem = new ItemStack(Material.ARROW, 1);
         ItemMeta backMeta = backItem.getItemMeta();
-        backMeta.setDisplayName("§cBack to Game Setup");
+        backMeta.setDisplayName("§c§lBack to Game Setup");
         backItem.setItemMeta(backMeta);
         inv.setItem(0, backItem);
 
         // Reset all button
         ItemStack resetItem = new ItemStack(Material.BARRIER, 1);
         ItemMeta resetMeta = resetItem.getItemMeta();
-        resetMeta.setDisplayName("§cReset All Players");
+        resetMeta.setDisplayName("§c§lReset All Players");
         List<String> resetLore = new ArrayList<>();
         resetLore.add("§7Remove all players from the game");
         resetLore.add("§c§lWARNING: Cannot be undone!");
@@ -184,7 +270,7 @@ public class GameSetup {
         int startIndex = page * playersPerPage;
         int endIndex = Math.min(startIndex + playersPerPage, onlinePlayers.size());
 
-        // Add player heads
+        // Add player items
         int slot = 9; // Start after the title row
         for (int i = startIndex; i < endIndex; i++) {
             Player targetPlayer = onlinePlayers.get(i);
@@ -192,21 +278,15 @@ public class GameSetup {
             boolean isActive = gameModeManager.isPlayerActive(targetId);
 
             // Create player head
-            ItemStack playerItem;
-            if (!AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
-                playerItem = new ItemStack(Material.PLAYER_HEAD, 1);
-                SkullMeta skullMeta = (SkullMeta) playerItem.getItemMeta();
-                skullMeta.setOwningPlayer(targetPlayer);
-                playerItem.setItemMeta(skullMeta);
-            } else {
-                playerItem = isActive ?
-                        new ItemStack(Material.EMERALD, 1) :
-                        new ItemStack(Material.REDSTONE, 1);
-            }
+            ItemStack playerItem = new ItemStack(Material.PLAYER_HEAD, 1);
+            SkullMeta skullMeta = (SkullMeta) playerItem.getItemMeta();
+            skullMeta.setOwningPlayer(targetPlayer);
+            playerItem.setItemMeta(skullMeta);
 
             // Set display name and status
             ItemMeta meta = playerItem.getItemMeta();
-            meta.setDisplayName((isActive ? "§a" : "§c") + targetPlayer.getName());
+            meta.setDisplayName((isActive ? "§a" : "§c") + targetPlayer.getName() +
+                    (isActive ? " §a✓" : ""));
 
             List<String> lore = new ArrayList<>();
             lore.add(isActive ? "§aActive in game" : "§cNot in game");
@@ -223,17 +303,12 @@ public class GameSetup {
             // Previous page button
             ItemStack prevPage = new ItemStack(Material.ARROW, 1);
             ItemMeta prevMeta = prevPage.getItemMeta();
-            prevMeta.setDisplayName("§6Previous Page");
+            prevMeta.setDisplayName("§6§lPrevious Page");
             prevPage.setItemMeta(prevMeta);
             inv.setItem(45, prevPage);
 
             // Page indicator
-            ItemStack pageIndicator;
-            if (AllAchievements.getInstance().getVersion().startsWith("v1_12")) {
-                pageIndicator = new ItemStack(Material.getMaterial("STAINED_GLASS_PANE"), 1, (byte)4);
-            } else {
-                pageIndicator = new ItemStack(Material.YELLOW_STAINED_GLASS_PANE, 1);
-            }
+            ItemStack pageIndicator = new ItemStack(Material.YELLOW_STAINED_GLASS_PANE, 1);
             ItemMeta pageMeta = pageIndicator.getItemMeta();
             pageMeta.setDisplayName("§6Page " + (page + 1) + " of " + totalPages);
             pageIndicator.setItemMeta(pageMeta);
@@ -242,7 +317,7 @@ public class GameSetup {
             // Next page button
             ItemStack nextPage = new ItemStack(Material.ARROW, 1);
             ItemMeta nextMeta = nextPage.getItemMeta();
-            nextMeta.setDisplayName("§6Next Page");
+            nextMeta.setDisplayName("§6§lNext Page");
             nextPage.setItemMeta(nextMeta);
             inv.setItem(53, nextPage);
         }
@@ -251,7 +326,7 @@ public class GameSetup {
     }
 
     /**
-     * Handle inventory click events in the setup UI
+     * Handle inventory click events in the setup UI with improved feedback
      */
     public static void handleInventoryClick(InventoryClickEvent event) {
         String title = event.getView().getTitle();
@@ -262,52 +337,60 @@ public class GameSetup {
         event.setCancelled(true);
 
         // Main game setup UI
-        if (title.equals("§6AllAchievements §7- §eGame Setup")) {
+        if (title.equals("§6§lAllAchievements §8- §eSetup")) {
             // Game mode selection
-            if (slot == 10) { // Solo mode
+            if (slot == 11) { // Solo mode
                 setGameMode(player, GameModeManager.GameMode.SOLO);
+                playClickSound(player);
                 showSetupUI(player);
             } else if (slot == 13) { // Coop mode
                 setGameMode(player, GameModeManager.GameMode.COOP);
+                playClickSound(player);
                 showSetupUI(player);
-            } else if (slot == 16) { // Versus mode
+            } else if (slot == 15) { // Versus mode
                 setGameMode(player, GameModeManager.GameMode.VERSUS);
+                playClickSound(player);
                 showSetupUI(player);
             }
             // Player management
             else if (slot == 22) {
+                playClickSound(player);
                 showPlayerManagementUI(player, 0);
             }
             // Start/Stop game
-            else if (slot == 4) {
+            else if (slot == 31) {
                 GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
 
                 if (gameModeManager.isGameActive()) {
                     // Stop the game
                     gameModeManager.endGame();
                     player.sendMessage("§7-------- §6AllAchievements§7 ----------");
-                    player.sendMessage("§cGame has been stopped.");
+                    player.sendMessage("§c§lGame has been stopped.");
                     player.sendMessage("§7--------------------------------");
+                    playSuccessSound(player);
                 } else {
                     // Start the game
                     if (gameModeManager.getGameMode() != GameModeManager.GameMode.SOLO &&
                             gameModeManager.getActivePlayers().isEmpty()) {
                         player.sendMessage("§7-------- §6AllAchievements§7 ----------");
-                        player.sendMessage("§cCannot start game: No players added!");
+                        player.sendMessage("§c§lCannot start game: No players added!");
                         player.sendMessage("§7--------------------------------");
+                        playErrorSound(player);
                     } else {
                         gameModeManager.startGame();
                         player.sendMessage("§7-------- §6AllAchievements§7 ----------");
-                        player.sendMessage("§aGame has been started in " + gameModeManager.getGameMode() + " mode!");
+                        player.sendMessage("§a§lGame has been started in " + gameModeManager.getGameMode() + " mode!");
                         player.sendMessage("§7--------------------------------");
+                        playSuccessSound(player);
 
                         // Notify all active players
                         for (UUID playerId : gameModeManager.getActivePlayers()) {
                             Player gamePlayer = Bukkit.getPlayer(playerId);
                             if (gamePlayer != null && gamePlayer != player) {
                                 gamePlayer.sendMessage("§7-------- §6AllAchievements§7 ----------");
-                                gamePlayer.sendMessage("§aA new " + gameModeManager.getGameMode() + " game has started!");
+                                gamePlayer.sendMessage("§a§lA new " + gameModeManager.getGameMode() + " game has started!");
                                 gamePlayer.sendMessage("§7--------------------------------");
+                                playSuccessSound(gamePlayer);
                             }
                         }
                     }
@@ -316,13 +399,38 @@ public class GameSetup {
                 // Update the UI
                 showSetupUI(player);
             }
+            // Resume game button
+            else if (slot == 30 && AllAchievements.getInstance().getGameModeManager().isGamePaused()) {
+                // Resume game
+                boolean paused = AllAchievements.getInstance().getGameModeManager().togglePauseGame();
+                playClickSound(player);
+                showSetupUI(player);
+            }
+            // Pause game button
+            else if (slot == 32 || (slot == 31 && AllAchievements.getInstance().getGameModeManager().isGameActive())) {
+                // Pause game
+                boolean paused = AllAchievements.getInstance().getGameModeManager().togglePauseGame();
+                playClickSound(player);
+                showSetupUI(player);
+            }
+            // Stats button
+            else if (slot == 27) {
+                playClickSound(player);
+                Stats.showStats(player, player, 0);
+            }
+            // Leaderboard button
+            else if (slot == 35) {
+                playClickSound(player);
+                Leaderboard.showLeaderboard(player, 0);
+            }
         }
         // Player management UI
-        else if (title.equals("§6AllAchievements §7- §ePlayer Management")) {
+        else if (title.equals("§d§lManage Players")) {
             GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
 
             // Back button
             if (slot == 0) {
+                playClickSound(player);
                 showSetupUI(player);
             }
             // Reset all players button
@@ -330,8 +438,9 @@ public class GameSetup {
                 gameModeManager.getActivePlayers().clear();
                 gameModeManager.saveConfig(); // Save the changes to persist them
                 player.sendMessage("§7-------- §6AllAchievements§7 ----------");
-                player.sendMessage("§cAll players have been removed from the game.");
+                player.sendMessage("§c§lAll players have been removed from the game.");
                 player.sendMessage("§7--------------------------------");
+                playSuccessSound(player);
 
                 // Update the UI
                 showPlayerManagementUI(player, 0);
@@ -358,6 +467,7 @@ public class GameSetup {
                         newPage = Math.min(totalPages - 1, currentPage + 1);
                     }
 
+                    playClickSound(player);
                     showPlayerManagementUI(player, newPage);
                 }
             }
@@ -367,7 +477,7 @@ public class GameSetup {
                 if (clickedItem != null && clickedItem.hasItemMeta() && clickedItem.getItemMeta().hasDisplayName()) {
                     String playerName = clickedItem.getItemMeta().getDisplayName();
                     if (playerName.startsWith("§a") || playerName.startsWith("§c")) {
-                        playerName = playerName.substring(2); // Remove color code
+                        playerName = playerName.replace(" §a✓", "").substring(2); // Remove color code and check mark
 
                         Player targetPlayer = Bukkit.getPlayer(playerName);
                         if (targetPlayer != null) {
@@ -379,14 +489,16 @@ public class GameSetup {
                                 // Remove player
                                 gameModeManager.removePlayer(targetId);
                                 player.sendMessage("§7-------- §6AllAchievements§7 ----------");
-                                player.sendMessage("§cRemoved " + targetPlayer.getName() + " from the game.");
+                                player.sendMessage("§c§lRemoved " + targetPlayer.getName() + " from the game.");
                                 player.sendMessage("§7--------------------------------");
+                                playClickSound(player);
                             } else {
                                 // Add player
                                 gameModeManager.addPlayer(targetId);
                                 player.sendMessage("§7-------- §6AllAchievements§7 ----------");
-                                player.sendMessage("§aAdded " + targetPlayer.getName() + " to the game.");
+                                player.sendMessage("§a§lAdded " + targetPlayer.getName() + " to the game.");
                                 player.sendMessage("§7--------------------------------");
+                                playSuccessSound(player);
                             }
 
                             // Get current page
@@ -407,7 +519,7 @@ public class GameSetup {
     }
 
     /**
-     * Set the active game mode
+     * Set the active game mode with improved feedback
      */
     private static void setGameMode(Player player, GameModeManager.GameMode mode) {
         GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
@@ -415,16 +527,51 @@ public class GameSetup {
         // Cannot change mode if a game is active
         if (gameModeManager.isGameActive()) {
             player.sendMessage("§7-------- §6AllAchievements§7 ----------");
-            player.sendMessage("§cCannot change game mode while a game is active!");
+            player.sendMessage("§c§lCannot change game mode while a game is active!");
             player.sendMessage("§cStop the current game first.");
             player.sendMessage("§7--------------------------------");
+            playErrorSound(player);
             return;
         }
 
         // Set the mode and save configuration
         gameModeManager.setGameMode(mode);
         player.sendMessage("§7-------- §6AllAchievements§7 ----------");
-        player.sendMessage("§aGame mode set to " + mode);
+        player.sendMessage("§a§lGame mode set to " + mode);
         player.sendMessage("§7--------------------------------");
+        playSuccessSound(player);
+    }
+
+    /**
+     * Play a click sound for UI feedback
+     */
+    private static void playClickSound(Player player) {
+        try {
+            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.5f, 1.0f);
+        } catch (Exception e) {
+            // Ignore if sound doesn't exist
+        }
+    }
+
+    /**
+     * Play a success sound for positive feedback
+     */
+    private static void playSuccessSound(Player player) {
+        try {
+            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.5f, 1.0f);
+        } catch (Exception e) {
+            // Ignore if sound doesn't exist
+        }
+    }
+
+    /**
+     * Play an error sound for negative feedback
+     */
+    private static void playErrorSound(Player player) {
+        try {
+            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.5f, 0.5f);
+        } catch (Exception e) {
+            // Ignore if sound doesn't exist
+        }
     }
 }
