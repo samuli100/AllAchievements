@@ -8,6 +8,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -40,6 +41,7 @@ public class Backpack implements Listener {
      */
     public class BackpackHolder implements InventoryHolder {
         private final String backpackId;
+        private Inventory inventory;
 
         public BackpackHolder(String backpackId) {
             this.backpackId = backpackId;
@@ -51,14 +53,18 @@ public class Backpack implements Listener {
 
         @Override
         public Inventory getInventory() {
-            return null; // This is just for implementation, actual inventory is stored elsewhere
+            return inventory;
+        }
+
+        public void setInventory(Inventory inventory) {
+            this.inventory = inventory;
         }
     }
 
     private final AllAchievements plugin;
     private final File backpackFolder;
     private final NamespacedKey backpackKey;
-    private final Map<UUID, Inventory> openBackpacks = new HashMap<>();
+    private final Map<UUID, String> openBackpackIds = new HashMap<>();
 
     public Backpack(AllAchievements plugin) {
         this.plugin = plugin;
@@ -68,9 +74,6 @@ public class Backpack implements Listener {
         if (!backpackFolder.exists()) {
             backpackFolder.mkdirs();
         }
-
-        // Register events
-        Bukkit.getPluginManager().registerEvents(this, plugin);
 
         // Register recipe
         registerBackpackRecipe();
@@ -105,8 +108,8 @@ public class Backpack implements Listener {
      * Creates a new backpack item with a unique ID
      */
     public ItemStack createBackpack() {
-        // Use the helper to get the appropriate material
-        Material material = BackpackHelper.getBackpackMaterial(plugin.getVersion());
+        // Always use CHEST instead of Bundle to avoid native behavior conflicts
+        Material material = Material.CHEST;
 
         ItemStack backpack = new ItemStack(material, 1);
         ItemMeta meta = backpack.getItemMeta();
@@ -116,7 +119,17 @@ public class Backpack implements Listener {
         List<String> lore = new ArrayList<>();
         lore.add(ChatColor.GRAY + "Right-click to open");
         lore.add(ChatColor.GRAY + "Double chest inventory");
+
+        // Add a third lore line to help identify this as a backpack
+        lore.add(ChatColor.DARK_GRAY + "ID: " + UUID.randomUUID().toString().substring(0, 8));
         meta.setLore(lore);
+
+        // Set custom model data if supported by this version
+        try {
+            meta.setCustomModelData(1001);
+        } catch (NoSuchMethodError e) {
+            // Custom model data not supported in this version, ignore
+        }
 
         // Add unique ID to the item
         String uniqueId = UUID.randomUUID().toString();
@@ -162,11 +175,8 @@ public class Backpack implements Listener {
         // Open the inventory for the player
         player.openInventory(backpackInventory);
 
-        // Store reference to the open backpack with its ID
-        openBackpacks.put(player.getUniqueId(), backpackInventory);
-
-        // Store the backpack ID in the player's metadata
-        player.setMetadata("backpack_id", new org.bukkit.metadata.FixedMetadataValue(plugin, backpackId));
+        // Store the backpack ID for this player
+        openBackpackIds.put(player.getUniqueId(), backpackId);
     }
 
     /**
@@ -178,6 +188,9 @@ public class Backpack implements Listener {
         // Create a custom inventory holder with the backpack ID
         BackpackHolder holder = new BackpackHolder(backpackId);
         Inventory inventory = Bukkit.createInventory(holder, 54, ChatColor.GOLD + "Backpack");
+
+        // Store the inventory in the holder for direct access
+        holder.setInventory(inventory);
 
         if (backpackFile.exists()) {
             FileConfiguration config = YamlConfiguration.loadConfiguration(backpackFile);
@@ -221,9 +234,9 @@ public class Backpack implements Listener {
     }
 
     /**
-     * Handle player interaction with backpack
+     * Handle player interaction with backpack - with high priority to override Bundle behavior
      */
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGH)
     public void onPlayerInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
@@ -232,25 +245,16 @@ public class Backpack implements Listener {
         if ((event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) && item != null) {
             // Verify this is a backpack
             if (isBackpack(item)) {
-                // Cancel the default interaction (especially important for bundles)
+                // Cancel the event to prevent default bundle behavior and block placing
                 event.setCancelled(true);
 
                 // Get the backpack ID
                 String backpackId = getBackpackId(item);
                 if (backpackId != null) {
-                    // Make sure the player actually has this item (anti-cheat check)
-                    boolean hasItem = false;
-                    for (ItemStack invItem : player.getInventory().getContents()) {
-                        if (invItem != null && invItem.equals(item)) {
-                            hasItem = true;
-                            break;
-                        }
-                    }
-
-                    if (hasItem) {
-                        // Open the backpack
+                    // Use a small delay to ensure the event cancellation takes effect
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
                         openBackpack(player, backpackId);
-                    }
+                    }, 1L);
                 }
             }
         }
@@ -269,47 +273,53 @@ public class Backpack implements Listener {
         UUID playerId = player.getUniqueId();
 
         // Check if this is a backpack inventory being closed
-        if (openBackpacks.containsKey(playerId)) {
-            Inventory backpackInventory = openBackpacks.get(playerId);
+        if (openBackpackIds.containsKey(playerId)) {
+            String backpackId = openBackpackIds.get(playerId);
 
-            // Make sure it's the same inventory being closed
-            if (event.getInventory().equals(backpackInventory)) {
-                // Get the backpack ID from player metadata
-                if (player.hasMetadata("backpack_id")) {
-                    String backpackId = player.getMetadata("backpack_id").get(0).asString();
+            // Check if this inventory holder is a backpack holder
+            if (event.getInventory().getHolder() instanceof BackpackHolder) {
+                BackpackHolder holder = (BackpackHolder) event.getInventory().getHolder();
 
+                // Make sure it's the same backpack ID
+                if (holder.getBackpackId().equals(backpackId)) {
                     // Save the backpack contents
-                    saveBackpack(backpackId, backpackInventory);
+                    saveBackpack(backpackId, event.getInventory());
 
-                    // Remove metadata
-                    player.removeMetadata("backpack_id", plugin);
+                    // Remove from open backpacks map
+                    openBackpackIds.remove(playerId);
                 }
-
-                // Remove from open backpacks map
-                openBackpacks.remove(playerId);
             }
         }
     }
 
     /**
-     * Handle inventory click events to prevent nesting backpacks
+     * Handle inventory click events to prevent nesting backpacks, but allow normal item movement
      */
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        // Check if this is a backpack inventory
+        // Only check for backpacks in backpacks, don't interfere with normal item moving
         if (event.getInventory().getHolder() instanceof BackpackHolder) {
-            // Check if player is trying to put a backpack inside a backpack
-            ItemStack clickedItem = event.getCurrentItem();
-            ItemStack cursorItem = event.getCursor();
+            ItemStack cursor = event.getCursor();
+            ItemStack current = event.getCurrentItem();
 
-            // Prevent putting backpacks inside backpacks
-            if ((clickedItem != null && isBackpack(clickedItem)) ||
-                    (cursorItem != null && isBackpack(cursorItem))) {
+            // Check if player is trying to place a backpack inside a backpack
+            if (cursor != null && isBackpack(cursor)) {
                 event.setCancelled(true);
                 if (event.getWhoClicked() instanceof Player) {
                     Player player = (Player) event.getWhoClicked();
                     player.sendMessage(ChatColor.RED + "You cannot put a backpack inside another backpack!");
                 }
+                return;
+            }
+
+            // Also check if player is shift-clicking a backpack from their inventory
+            if (event.isShiftClick() && current != null && isBackpack(current)) {
+                event.setCancelled(true);
+                if (event.getWhoClicked() instanceof Player) {
+                    Player player = (Player) event.getWhoClicked();
+                    player.sendMessage(ChatColor.RED + "You cannot put a backpack inside another backpack!");
+                }
+                return;
             }
         }
     }
@@ -319,7 +329,7 @@ public class Backpack implements Listener {
      */
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent event) {
-        // Check if this is a backpack inventory
+        // Only check for backpacks in backpacks, don't interfere with normal item moving
         if (event.getInventory().getHolder() instanceof BackpackHolder) {
             // Check if player is trying to drag a backpack into a backpack
             ItemStack draggedItem = event.getOldCursor();
@@ -332,12 +342,5 @@ public class Backpack implements Listener {
                 }
             }
         }
-    }
-
-    /**
-     * Get a command to give a player a backpack
-     */
-    public static String getGiveCommand(String playerName) {
-        return "/give " + playerName + " bundle{display:{Name:'{\"text\":\"Backpack\",\"color\":\"gold\"}',Lore:['{\"text\":\"Right-click to open\",\"color\":\"gray\"}','{\"text\":\"Double chest inventory\",\"color\":\"gray\"}']},CustomModelData:1,CustomBackpack:1} 1";
     }
 }

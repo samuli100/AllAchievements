@@ -156,8 +156,16 @@ public class Events implements Listener {
                 break;
 
             case COOP:
-                // Coop mode - notify all team members about progress
-                int teamCompletedCount = completedCount; // Using the player's count as team count
+                // For COOP mode, we get team progress from any player since they're all synchronized
+                // If team is empty (unlikely), use this player's progress
+                int teamCompletedCount = completedCount;
+                if (!gameModeManager.getActivePlayers().isEmpty()) {
+                    // Get team progress from first player (all players should have the same in COOP)
+                    UUID teamMemberId = gameModeManager.getActivePlayers().iterator().next();
+                    teamCompletedCount = AllAchievements.getInstance().getPlayerManager()
+                            .getPlayerData(teamMemberId)
+                            .getCompletedAdvancements().size();
+                }
 
                 for (UUID teamPlayerId : gameModeManager.getActivePlayers()) {
                     Player teamPlayer = Bukkit.getPlayer(teamPlayerId);
@@ -182,6 +190,7 @@ public class Events implements Listener {
                         if (teamPlayer != null && teamPlayer.isOnline()) {
                             teamPlayer.sendMessage("§7------- §6AllAchievements §aCoop§7 ---------");
                             teamPlayer.sendMessage("§aYour team has completed all achievements!");
+                            teamPlayer.sendMessage("§6Time: §a" + formatCoopTime(gameModeManager.getCoopSharedTimer()));
                             teamPlayer.sendMessage("§7------------------------------");
                             teamPlayer.sendMessage(" ");
                             teamPlayer.sendMessage("§6Want to play again? Type §a/av reset");
@@ -216,6 +225,17 @@ public class Events implements Listener {
                 }
                 break;
         }
+    }
+
+    /**
+     * Format COOP timer value for display
+     */
+    private String formatCoopTime(int seconds) {
+        int hours = seconds / 3600;
+        int remainder = seconds % 3600;
+        int minutes = remainder / 60;
+        int secs = remainder % 60;
+        return String.format("§6%02d:%02d:%02d", hours, minutes, secs);
     }
 
     /**
@@ -358,6 +378,22 @@ public class Events implements Listener {
 
         // Load player data if not already loaded
         AllAchievements.getInstance().getPlayerManager().loadPlayerData(playerId);
+
+        // If player joins during active COOP game and is in the active players list, sync them
+        GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
+        if (gameModeManager.isGameActive() &&
+                gameModeManager.getGameMode() == GameModeManager.GameMode.COOP &&
+                gameModeManager.isPlayerActive(playerId)) {
+
+            // COOP sync is handled in the GameModeManager when a player is added
+            // This ensures the player gets synced on join, even if they were already added
+            gameModeManager.addPlayer(playerId);
+
+            player.sendMessage("§7------- §6AllAchievements §aCoop§7 ---------");
+            player.sendMessage("§aYou've joined an active cooperative game!");
+            player.sendMessage("§aYour achievements have been synchronized with your team.");
+            player.sendMessage("§7--------------------------------");
+        }
     }
 
     @EventHandler

@@ -256,6 +256,15 @@ public class PlayerManager {
      * Update all player timers (called each second)
      */
     public void updateTimers() {
+        // In COOP mode, timer update is handled by GameModeManager
+        // This only handles SOLO and VERSUS modes
+        GameModeManager gameManager = AllAchievements.getInstance().getGameModeManager();
+        if (gameManager.getGameMode() == GameModeManager.GameMode.COOP &&
+                gameManager.isGameActive() &&
+                !gameManager.isGamePaused()) {
+            return; // COOP timer is handled separately
+        }
+
         for (UUID playerId : playerDataMap.keySet()) {
             PlayerData data = playerDataMap.get(playerId);
             if (data.isTimerRunning()) {

@@ -83,8 +83,15 @@ public class AllAchievements extends JavaPlugin implements Listener {
         Bukkit.getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
             @Override
             public void run() {
-                // Update player timers
-                playerManager.updateTimers();
+                // Update shared COOP timer if needed
+                if (gameModeManager.getGameMode() == GameModeManager.GameMode.COOP &&
+                        gameModeManager.isGameActive() &&
+                        !gameModeManager.isGamePaused()) {
+                    gameModeManager.updateCoopSharedTimer();
+                } else {
+                    // Update individual player timers for other modes
+                    playerManager.updateTimers();
+                }
 
                 // Update action bar for each player
                 for(Player player : Bukkit.getOnlinePlayers()){
@@ -101,10 +108,24 @@ public class AllAchievements extends JavaPlugin implements Listener {
                     // Display timer or just a default message
                     if(data.getTimerSeconds() > 0 || data.isTimerRunning()){
                         String gameMode = "";
+                        String timerValue = "";
+
+                        // For COOP mode, show the shared timer for everyone
                         if (gameModeManager.getGameMode() == GameModeManager.GameMode.COOP) {
                             gameMode = " §7[§aCoop§7]";
+
+                            // Format the shared timer
+                            int seconds = gameModeManager.getCoopSharedTimer();
+                            int hours = seconds / 3600;
+                            int remainder = seconds % 3600;
+                            int minutes = remainder / 60;
+                            int secs = remainder % 60;
+                            timerValue = String.format("§6%02d:%02d:%02d", hours, minutes, secs);
                         } else if (gameModeManager.getGameMode() == GameModeManager.GameMode.VERSUS) {
                             gameMode = " §7[§cVersus§7]";
+                            timerValue = playerManager.getFormattedTime(playerId);
+                        } else {
+                            timerValue = playerManager.getFormattedTime(playerId);
                         }
 
                         // Get player progress
@@ -115,7 +136,7 @@ public class AllAchievements extends JavaPlugin implements Listener {
                         // Show timer with game mode and progress
                         player.spigot().sendMessage(
                                 ChatMessageType.ACTION_BAR,
-                                TextComponent.fromLegacyText(playerManager.getFormattedTime(playerId) + gameMode + " " + progress)
+                                TextComponent.fromLegacyText(timerValue + gameMode + " " + progress)
                         );
                     } else {
                         player.spigot().sendMessage(
@@ -203,6 +224,19 @@ public class AllAchievements extends JavaPlugin implements Listener {
 
     // Get formatted time for a specific player
     public String getTime(UUID playerId){
+        // For COOP mode, return the shared timer
+        if (gameModeManager.getGameMode() == GameModeManager.GameMode.COOP &&
+                gameModeManager.isGameActive() &&
+                gameModeManager.isPlayerActive(playerId)) {
+            int seconds = gameModeManager.getCoopSharedTimer();
+            int hours = seconds / 3600;
+            int remainder = seconds % 3600;
+            int minutes = remainder / 60;
+            int secs = remainder % 60;
+            return String.format("§6%02d:%02d:%02d", hours, minutes, secs);
+        }
+
+        // For other modes, use the player-specific timer
         return playerManager.getFormattedTime(playerId);
     }
 

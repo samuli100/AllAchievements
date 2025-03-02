@@ -4,7 +4,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,6 +28,9 @@ public class GameModeManager {
     private final List<UUID> activePlayers = new ArrayList<>();
     private boolean gameActive = false;
     private boolean gamePaused = false; // New field to track pause state
+
+    // COOP mode shared timer value
+    private int coopSharedTimer = 0;
 
     private final File configFile;
     private FileConfiguration config;
@@ -75,6 +77,7 @@ public class GameModeManager {
 
         gameActive = config.getBoolean("gameActive", false);
         gamePaused = config.getBoolean("gamePaused", false); // Load pause state
+        coopSharedTimer = config.getInt("coopSharedTimer", 0); // Load shared timer
     }
 
     /**
@@ -90,6 +93,7 @@ public class GameModeManager {
         config.set("activePlayers", playerIds);
         config.set("gameActive", gameActive);
         config.set("gamePaused", gamePaused); // Save pause state
+        config.set("coopSharedTimer", coopSharedTimer); // Save shared timer
 
         try {
             config.save(configFile);
@@ -119,7 +123,59 @@ public class GameModeManager {
     public void addPlayer(UUID playerId) {
         if (!activePlayers.contains(playerId)) {
             activePlayers.add(playerId);
+
+            // If in COOP mode, sync this player's advancements with team
+            if (currentGameMode == GameMode.COOP && gameActive) {
+                syncPlayerWithCoopTeam(playerId);
+            }
+
             saveConfig();
+        }
+    }
+
+    /**
+     * Synchronize a player with the rest of the COOP team
+     */
+    private void syncPlayerWithCoopTeam(UUID newPlayerId) {
+        // Skip if there are no other players
+        if (activePlayers.size() <= 1) {
+            return;
+        }
+
+        // Find another player to copy advancements from
+        UUID sourcePlayerId = null;
+        for (UUID id : activePlayers) {
+            if (!id.equals(newPlayerId)) {
+                sourcePlayerId = id;
+                break;
+            }
+        }
+
+        if (sourcePlayerId != null) {
+            // Copy all completed advancements from source player
+            PlayerManager.PlayerData sourceData = plugin.getPlayerManager().getPlayerData(sourcePlayerId);
+            PlayerManager.PlayerData newPlayerData = plugin.getPlayerManager().getPlayerData(newPlayerId);
+
+            for (String advancement : sourceData.getCompletedAdvancements()) {
+                newPlayerData.addAdvancement(advancement);
+            }
+
+            // Set timer equal to shared timer
+            newPlayerData.setTimerSeconds(coopSharedTimer);
+
+            // Save the player data
+            plugin.getPlayerManager().savePlayerData(newPlayerId);
+
+            // Log the synchronization
+            plugin.getLogger().info("Synchronized player " + newPlayerId + " with COOP team");
+
+            // Notify the player if online
+            Player player = Bukkit.getPlayer(newPlayerId);
+            if (player != null && player.isOnline()) {
+                player.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                player.sendMessage("§aYour achievements have been synchronized with your team!");
+                player.sendMessage("§7--------------------------------");
+            }
         }
     }
 
@@ -154,10 +210,17 @@ public class GameModeManager {
     public void startGame() {
         gameActive = true;
         gamePaused = false; // Ensure game starts unpaused
+        coopSharedTimer = 0; // Reset the shared timer
 
         // In cooperative or versus mode, start the timer for all active players
         if (currentGameMode != GameMode.SOLO) {
             for (UUID playerId : activePlayers) {
+                // Set timer to 0 for all players in COOP mode
+                if (currentGameMode == GameMode.COOP) {
+                    PlayerManager.PlayerData playerData = plugin.getPlayerManager().getPlayerData(playerId);
+                    playerData.setTimerSeconds(0);
+                }
+
                 plugin.getPlayerManager().startTimer(playerId);
             }
         }
@@ -243,6 +306,31 @@ public class GameModeManager {
     }
 
     /**
+     * Update the COOP shared timer
+     * Called from the timer task in AllAchievements
+     */
+    public void updateCoopSharedTimer() {
+        if (gameActive && !gamePaused && currentGameMode == GameMode.COOP) {
+            coopSharedTimer++;
+
+            // Update all player timers to match the shared timer
+            for (UUID playerId : activePlayers) {
+                PlayerManager.PlayerData data = plugin.getPlayerManager().getPlayerData(playerId);
+                if (data.isTimerRunning() && data.getTimerSeconds() != coopSharedTimer) {
+                    data.setTimerSeconds(coopSharedTimer);
+                }
+            }
+        }
+    }
+
+    /**
+     * Get the shared COOP timer value
+     */
+    public int getCoopSharedTimer() {
+        return coopSharedTimer;
+    }
+
+    /**
      * Handle advancement completion based on game mode
      * Returns false if advancements are currently disabled due to pause
      */
@@ -257,6 +345,7 @@ public class GameModeManager {
         switch (currentGameMode) {
             case SOLO:
                 // In solo mode, advancements only count for the player who earned them
+                plugin.getPlayerManager().completeAdvancement(playerId, advancementKey);
                 break;
 
             case COOP:
@@ -280,6 +369,8 @@ public class GameModeManager {
 
             case VERSUS:
                 // In versus mode, only the player who earned it gets credit
+                plugin.getPlayerManager().completeAdvancement(playerId, advancementKey);
+
                 // Check if this player has completed all advancements (winning the race)
                 checkVersusWinCondition(playerId);
                 break;
@@ -318,5 +409,9 @@ public class GameModeManager {
         for (UUID playerId : activePlayers) {
             plugin.reset(playerId);
         }
+
+        // Reset the shared timer
+        coopSharedTimer = 0;
+        saveConfig();
     }
 }
