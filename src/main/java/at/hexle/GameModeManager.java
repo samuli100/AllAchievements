@@ -27,6 +27,7 @@ public class GameModeManager {
     private GameMode currentGameMode = GameMode.SOLO;
     private final List<UUID> activePlayers = new ArrayList<>();
     private boolean gameActive = false;
+    private boolean gamePaused = false; // New field to track pause state
 
     private final File configFile;
     private FileConfiguration config;
@@ -72,6 +73,7 @@ public class GameModeManager {
         }
 
         gameActive = config.getBoolean("gameActive", false);
+        gamePaused = config.getBoolean("gamePaused", false); // Load pause state
     }
 
     /**
@@ -86,6 +88,7 @@ public class GameModeManager {
         }
         config.set("activePlayers", playerIds);
         config.set("gameActive", gameActive);
+        config.set("gamePaused", gamePaused); // Save pause state
 
         try {
             config.save(configFile);
@@ -149,11 +152,12 @@ public class GameModeManager {
      */
     public void startGame() {
         gameActive = true;
+        gamePaused = false; // Ensure game starts unpaused
 
         // In cooperative or versus mode, start the timer for all active players
         if (currentGameMode != GameMode.SOLO) {
             for (UUID playerId : activePlayers) {
-                plugin.start(playerId);
+                plugin.getPlayerManager().startTimer(playerId);
             }
         }
 
@@ -165,17 +169,54 @@ public class GameModeManager {
      */
     public void endGame() {
         gameActive = false;
+        gamePaused = false; // Reset pause state
 
         // In cooperative or versus mode, pause the timer for all active players
         if (currentGameMode != GameMode.SOLO) {
             for (UUID playerId : activePlayers) {
-                if (plugin.isRunning(playerId)) {
-                    plugin.pause(playerId);
+                PlayerManager.PlayerData data = plugin.getPlayerManager().getPlayerData(playerId);
+                if (data.isTimerRunning()) {
+                    plugin.getPlayerManager().stopTimer(playerId);
                 }
             }
         }
 
         saveConfig();
+    }
+
+    /**
+     * Pause or resume the current game
+     * @return true if the game is now paused, false if it's now running
+     */
+    public boolean togglePauseGame() {
+        if (!gameActive) {
+            return false; // Can't pause/resume if game isn't active
+        }
+
+        gamePaused = !gamePaused;
+
+        // Toggle timers for all active players based on game mode
+        if (currentGameMode != GameMode.SOLO) {
+            for (UUID playerId : activePlayers) {
+                PlayerManager.PlayerData data = plugin.getPlayerManager().getPlayerData(playerId);
+                data.setTimerRunning(!gamePaused);
+                plugin.getPlayerManager().savePlayerData(playerId);
+
+                // Notify player of game state change
+                Player player = Bukkit.getPlayer(playerId);
+                if (player != null && player.isOnline()) {
+                    player.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                    player.sendMessage(gamePaused ?
+                            "§cThe team achievement challenge has been paused!" :
+                            "§aThe team achievement challenge has been resumed!");
+                    player.sendMessage("§7--------------------------------");
+                }
+            }
+        }
+
+        saveConfig();
+        plugin.getLogger().info("Game " + (gamePaused ? "paused" : "resumed") + " in " + currentGameMode + " mode");
+        return gamePaused;
     }
 
     /**
@@ -186,9 +227,24 @@ public class GameModeManager {
     }
 
     /**
-     * Handle advancement completion based on game mode
+     * Check if the game is currently paused
      */
-    public void handleAdvancementCompletion(UUID playerId, String advancementKey) {
+    public boolean isGamePaused() {
+        return gamePaused;
+    }
+
+    /**
+     * Handle advancement completion based on game mode
+     * Returns false if advancements are currently disabled due to pause
+     */
+    public boolean handleAdvancementCompletion(UUID playerId, String advancementKey) {
+        // Check if game is paused - if so, don't process advancements
+        if (gamePaused) {
+            plugin.getLogger().info("Ignoring advancement " + advancementKey +
+                    " for player " + playerId + " because game is paused");
+            return false;
+        }
+
         switch (currentGameMode) {
             case SOLO:
                 // In solo mode, advancements only count for the player who earned them
@@ -219,13 +275,15 @@ public class GameModeManager {
                 checkVersusWinCondition(playerId);
                 break;
         }
+
+        return true;
     }
 
     /**
      * Check if a player has won in versus mode
      */
     private void checkVersusWinCondition(UUID playerId) {
-        if (currentGameMode == GameMode.VERSUS && gameActive) {
+        if (currentGameMode == GameMode.VERSUS && gameActive && !gamePaused) {
             if (plugin.getPlayerManager().hasCompletedAllAdvancements(playerId, plugin.getAdvancementList())) {
                 // Player has won the race!
                 Player winner = Bukkit.getPlayer(playerId);

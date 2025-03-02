@@ -23,6 +23,15 @@ public class Events implements Listener {
         UUID playerId = player.getUniqueId();
         Advancement advancement = event.getAdvancement();
 
+        // Check if game is paused - skip all achievement processing if so
+        GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
+        if (gameModeManager.isGamePaused()) {
+            // Log and ignore advancements during pause
+            Bukkit.getLogger().info("Advancement " + advancement.getKey() +
+                    " by " + player.getName() + " ignored because game is paused");
+            return;
+        }
+
         // Check if this is a valid advancement we should track
         boolean isValidAdvancement = false;
         // FIXED: Add 1.21 to the version check
@@ -45,22 +54,24 @@ public class Events implements Listener {
 
         if (!isValidAdvancement) return;
 
-        // Check game mode and handle accordingly
-        GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
-        GameModeManager.GameMode currentMode = gameModeManager.getGameMode();
-
         // Check if player already has this advancement
         if (AllAchievements.getInstance().hasCompletedAdvancement(playerId, advancement)) return;
 
         // Mark the advancement as completed based on the game mode
-        AllAchievements.getInstance().completeAdvancement(playerId, advancement);
+        // This will also respect the pause state through the handleAdvancementCompletion method
+        boolean processed = gameModeManager.handleAdvancementCompletion(
+                playerId, advancement.getKey().toString());
+
+        // If advancement wasn't processed (game is paused), don't continue
+        if (!processed) return;
 
         // Get total advancement count and completed count for this specific player
         List<Advancement> totalAdvancements = AllAchievements.getInstance().getAdvancementList();
-        int completedCount = AllAchievements.getInstance().getFinishedAchievements(playerId).size();
+        int completedCount = AllAchievements.getInstance().getPlayerManager()
+                .getPlayerData(playerId).getCompletedAdvancements().size();
 
         // Notify based on game mode
-        switch (currentMode) {
+        switch (gameModeManager.getGameMode()) {
             case SOLO:
                 // Solo mode - only notify the player about their progress
                 player.sendMessage("§7------- §6AllAchievements§7 ---------");
@@ -149,14 +160,11 @@ public class Events implements Listener {
                         }
                     }
                 }
-
-                // The GameModeManager will handle the win condition checking
                 break;
         }
     }
 
-    // Fix for the inventory click event handler in Stats section:
-
+    // Keep the rest of the Events class the same
     @EventHandler
     public void onInvClick(InventoryClickEvent event) {
         String title = event.getView().getTitle();

@@ -24,7 +24,7 @@ public class Commands implements CommandExecutor {
                 args[0].equalsIgnoreCase("setup") ||
                 args[0].equalsIgnoreCase("leaderboard"))) {
             sender.sendMessage("§cThis command must be run by a player!");
-            return false;
+            return true;
         }
 
         switch (args[0].toLowerCase()) {
@@ -32,17 +32,17 @@ public class Commands implements CommandExecutor {
                 // Game setup command - requires permission
                 if (!sender.hasPermission("av.admin")) {
                     noPerm(sender);
-                    return false;
+                    return true;
                 }
 
                 // Open the game setup UI
                 GameSetup.showSetupUI((Player) sender);
-                break;
+                return true;
 
             case "start":
                 if (!sender.hasPermission("av.timer.start")) {
                     noPerm(sender);
-                    return false;
+                    return true;
                 }
 
                 // Check game mode
@@ -57,46 +57,28 @@ public class Commands implements CommandExecutor {
                         sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
                         sender.sendMessage("§cIn " + currentMode + " mode, the game must be started through /av setup");
                         sender.sendMessage("§7--------------------------------");
-                        return false;
                     } else {
                         sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
                         sender.sendMessage("§cPlease use /av setup to manage " + currentMode + " mode games");
                         sender.sendMessage("§7--------------------------------");
                     }
                 }
-                break;
+                return true;
 
             case "pause":
                 if (!sender.hasPermission("av.timer.pause")) {
                     noPerm(sender);
-                    return false;
+                    return true;
                 }
 
-                // Check game mode
-                currentMode = AllAchievements.getInstance().getGameModeManager().getGameMode();
-
-                if (currentMode == GameModeManager.GameMode.SOLO) {
-                    // Solo mode - pause individual timer
-                    handleSoloPause(sender, args);
-                } else {
-                    // Coop/Versus mode - requires admin to manage through setup UI
-                    if (!sender.hasPermission("av.admin")) {
-                        sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
-                        sender.sendMessage("§cIn " + currentMode + " mode, the game must be managed through /av setup");
-                        sender.sendMessage("§7--------------------------------");
-                        return false;
-                    } else {
-                        sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
-                        sender.sendMessage("§cPlease use /av setup to manage " + currentMode + " mode games");
-                        sender.sendMessage("§7--------------------------------");
-                    }
-                }
-                break;
+                // Enhanced pause command - works for all game modes
+                handlePauseCommand(sender, args);
+                return true;
 
             case "reset":
                 if (!sender.hasPermission("av.timer.reset")) {
                     noPerm(sender);
-                    return false;
+                    return true;
                 }
 
                 // Check game mode for permission handling
@@ -109,12 +91,12 @@ public class Commands implements CommandExecutor {
                     sender.sendMessage("§cIn " + currentMode + " mode, only admins can reset the game");
                     sender.sendMessage("§7--------------------------------");
                 }
-                break;
+                return true;
 
             case "stats":
                 if (!sender.hasPermission("av.stats")) {
                     noPerm(sender);
-                    return false;
+                    return true;
                 }
 
                 // Handle viewing stats
@@ -131,22 +113,22 @@ public class Commands implements CommandExecutor {
                     Player targetPlayer = (Player) sender;
                     Stats.showStats((Player) sender, targetPlayer, 0);
                 }
-                break;
+                return true;
 
             case "leaderboard":
                 if (!sender.hasPermission("av.leaderboard")) {
                     noPerm(sender);
-                    return false;
+                    return true;
                 }
 
                 // Show leaderboard
                 Leaderboard.showLeaderboard((Player) sender, 0);
-                break;
+                return true;
 
             case "mode":
                 if (!sender.hasPermission("av.admin")) {
                     noPerm(sender);
-                    return false;
+                    return true;
                 }
 
                 // If no mode specified, show current mode
@@ -170,7 +152,7 @@ public class Commands implements CommandExecutor {
                         sender.sendMessage("§cCannot change game mode while a game is active!");
                         sender.sendMessage("§cStop the current game first with /av setup.");
                         sender.sendMessage("§7--------------------------------");
-                        return false;
+                        return true;
                     }
 
                     // Set the mode
@@ -184,15 +166,13 @@ public class Commands implements CommandExecutor {
                     sender.sendMessage("§7Available modes: SOLO, COOP, VERSUS");
                     sender.sendMessage("§7--------------------------------");
                 }
-                break;
-
-            // Add this case to the switch statement in Commands.java, after the mode case:
+                return true;
 
             case "players":
                 // Player management command - requires admin permission
                 if (!sender.hasPermission("av.admin")) {
                     noPerm(sender);
-                    return false;
+                    return true;
                 }
 
                 if (args.length < 2) {
@@ -217,7 +197,7 @@ public class Commands implements CommandExecutor {
                             sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
                             sender.sendMessage("§cUsage: /av players add <player>");
                             sender.sendMessage("§7--------------------------------");
-                            return false;
+                            return true;
                         }
 
                         Player targetToAdd = Bukkit.getPlayer(args[2]);
@@ -225,7 +205,7 @@ public class Commands implements CommandExecutor {
                             sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
                             sender.sendMessage("§cPlayer not found: " + args[2]);
                             sender.sendMessage("§7--------------------------------");
-                            return false;
+                            return true;
                         }
 
                         UUID targetAddId = targetToAdd.getUniqueId();
@@ -233,7 +213,7 @@ public class Commands implements CommandExecutor {
                             sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
                             sender.sendMessage("§c" + targetToAdd.getName() + " is already in the game.");
                             sender.sendMessage("§7--------------------------------");
-                            return false;
+                            return true;
                         }
 
                         // Add the player
@@ -254,7 +234,7 @@ public class Commands implements CommandExecutor {
                             sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
                             sender.sendMessage("§cUsage: /av players remove <player>");
                             sender.sendMessage("§7--------------------------------");
-                            return false;
+                            return true;
                         }
 
                         Player targetToRemove = Bukkit.getPlayer(args[2]);
@@ -262,7 +242,7 @@ public class Commands implements CommandExecutor {
                             sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
                             sender.sendMessage("§cPlayer not found: " + args[2]);
                             sender.sendMessage("§7--------------------------------");
-                            return false;
+                            return true;
                         }
 
                         UUID targetRemoveId = targetToRemove.getUniqueId();
@@ -270,7 +250,7 @@ public class Commands implements CommandExecutor {
                             sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
                             sender.sendMessage("§c" + targetToRemove.getName() + " is not in the game.");
                             sender.sendMessage("§7--------------------------------");
-                            return false;
+                            return true;
                         }
 
                         // Remove the player
@@ -292,7 +272,7 @@ public class Commands implements CommandExecutor {
                             sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
                             sender.sendMessage("§cThere are no players in the game.");
                             sender.sendMessage("§7--------------------------------");
-                            return false;
+                            return true;
                         }
 
                         // Store the player list for notifications
@@ -324,15 +304,15 @@ public class Commands implements CommandExecutor {
                         sender.sendMessage("§7--------------------------------");
                         break;
                 }
-                break;
+                return true;
 
             case "forcestart":
                 if (!sender.hasPermission("av.admin")) {
                     noPerm(sender);
-                    return false;
+                    return true;
                 }
 
-                // End any active game first (use direct method calls instead of a local variable)
+                // End any active game first
                 if (AllAchievements.getInstance().getGameModeManager().isGameActive()) {
                     AllAchievements.getInstance().getGameModeManager().endGame();
                     sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
@@ -376,10 +356,112 @@ public class Commands implements CommandExecutor {
                         onlinePlayer.sendMessage("§7--------------------------------");
                     }
                 }
-                break;
-            // Rest of the method remains the same...
+                return true;
+
+            default:
+                // Unknown command
+                sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                sender.sendMessage("§cUnknown command: " + args[0]);
+                sender.sendMessage("§7Type /av for help.");
+                sender.sendMessage("§7--------------------------------");
+                return true;
         }
-        return false;
+    }
+
+    /**
+     * Handle the pause command in any game mode
+     */
+    private void handlePauseCommand(CommandSender sender, String[] args) {
+        GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
+        GameModeManager.GameMode currentMode = gameModeManager.getGameMode();
+
+        // For COOP and VERSUS modes with admin permission
+        if (currentMode != GameModeManager.GameMode.SOLO) {
+            if (sender.hasPermission("av.admin")) {
+                // Check if a game is active
+                if (!gameModeManager.isGameActive()) {
+                    sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                    sender.sendMessage("§cNo active game to pause. Start a game first.");
+                    sender.sendMessage("§7--------------------------------");
+                    return;
+                }
+
+                // Toggle pause for the entire game
+                boolean isPaused = gameModeManager.togglePauseGame();
+
+                // Notify the admin
+                sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                sender.sendMessage(isPaused ?
+                        "§cThe " + currentMode + " game has been paused. No advancements will be tracked." :
+                        "§aThe " + currentMode + " game has been resumed. Advancements will now be tracked.");
+                sender.sendMessage("§7--------------------------------");
+
+                // Broadcast to all players
+                for (UUID playerId : gameModeManager.getActivePlayers()) {
+                    Player player = Bukkit.getPlayer(playerId);
+                    if (player != null && player != sender) {
+                        player.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                        player.sendMessage(isPaused ?
+                                "§cThe game has been paused by an admin. Advancements are temporarily disabled." :
+                                "§aThe game has been resumed by an admin. Advancements are now being tracked.");
+                        player.sendMessage("§7--------------------------------");
+                    }
+                }
+            } else {
+                // Non-admin trying to pause team game
+                sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
+                sender.sendMessage("§cOnly admins can pause/resume " + currentMode + " games.");
+                sender.sendMessage("§7--------------------------------");
+            }
+            return;
+        }
+
+        // For SOLO mode
+        Player target;
+
+        // If args has a player name and sender has admin permission, use that player
+        if (args.length >= 2 && sender.hasPermission("av.admin")) {
+            target = Bukkit.getPlayer(args[1]);
+            if (target == null) {
+                sender.sendMessage("§cPlayer not found: " + args[1]);
+                return;
+            }
+        } else if (sender instanceof Player) {
+            // Otherwise use the sender if they're a player
+            target = (Player) sender;
+        } else {
+            sender.sendMessage("§cPlease specify a player name: /av pause <player>");
+            return;
+        }
+
+        UUID playerId = target.getUniqueId();
+
+        // Pause/unpause the timer
+        boolean wasRunning = AllAchievements.getInstance().isRunning(playerId);
+        AllAchievements.getInstance().pause(playerId);
+
+        // Notify the player and admin
+        target.sendMessage("§7-------- §6AllAchievements§7 ----------");
+        if (wasRunning) {
+            target.sendMessage("§cYour achievement challenge has been paused!");
+            target.sendMessage("§cAdvancements won't be tracked while paused.");
+            target.sendMessage("§6Current time: " + AllAchievements.getInstance().getTime(playerId));
+        } else {
+            target.sendMessage("§aYour achievement challenge has been resumed!");
+            target.sendMessage("§aAdvancements will now be tracked.");
+        }
+        target.sendMessage("§7--------------------------------");
+
+        if (sender != target) {
+            sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
+            if (wasRunning) {
+                sender.sendMessage("§cPaused achievement challenge for " + target.getName());
+                sender.sendMessage("§6Current time: " + AllAchievements.getInstance().getTime(playerId));
+            } else {
+                sender.sendMessage("§aResumed achievement challenge for " + target.getName());
+            }
+            sender.sendMessage("§7--------------------------------");
+        }
     }
 
     /**
@@ -448,53 +530,6 @@ public class Commands implements CommandExecutor {
         if (sender != target) {
             sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
             sender.sendMessage("§aStarted achievement challenge for " + target.getName());
-            sender.sendMessage("§7--------------------------------");
-        }
-    }
-
-    /**
-     * Handle pausing the timer in solo mode
-     */
-    private void handleSoloPause(CommandSender sender, String[] args) {
-        Player target;
-
-        // If args has a player name and sender has admin permission, use that player
-        if (args.length >= 2 && sender.hasPermission("av.admin")) {
-            target = Bukkit.getPlayer(args[1]);
-            if (target == null) {
-                sender.sendMessage("§cPlayer not found: " + args[1]);
-                return;
-            }
-        } else if (sender instanceof Player) {
-            // Otherwise use the sender if they're a player
-            target = (Player) sender;
-        } else {
-            sender.sendMessage("§cPlease specify a player name: /av pause <player>");
-            return;
-        }
-
-        UUID playerId = target.getUniqueId();
-
-        // Pause/unpause the timer
-        boolean wasRunning = AllAchievements.getInstance().isRunning(playerId);
-        AllAchievements.getInstance().pause(playerId);
-
-        // Notify the player and admin
-        target.sendMessage("§7-------- §6AllAchievements§7 ----------");
-        if (wasRunning) {
-            target.sendMessage("§cYour achievement challenge has been paused!");
-        } else {
-            target.sendMessage("§aYour achievement challenge has been resumed!");
-        }
-        target.sendMessage("§7--------------------------------");
-
-        if (sender != target) {
-            sender.sendMessage("§7-------- §6AllAchievements§7 ----------");
-            if (wasRunning) {
-                sender.sendMessage("§cPaused achievement challenge for " + target.getName());
-            } else {
-                sender.sendMessage("§aResumed achievement challenge for " + target.getName());
-            }
             sender.sendMessage("§7--------------------------------");
         }
     }
