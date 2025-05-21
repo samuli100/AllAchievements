@@ -1,4 +1,4 @@
-package at.hexle.api;
+package at.samuli100.api;
 
 import org.bukkit.advancement.*;
 import org.bukkit.inventory.*;

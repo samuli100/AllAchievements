@@ -1,4 +1,4 @@
-package at.hexle;
+package at.samuli100;
 
 import java.util.ArrayList;
 import java.util.List;

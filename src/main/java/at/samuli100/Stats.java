@@ -1,6 +1,6 @@
-package at.hexle;
+package at.samuli100;
 
-import at.hexle.api.AdvancementInfo;
+import at.samuli100.api.AdvancementInfo;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.advancement.Advancement;

@@ -1,4 +1,4 @@
-package at.hexle;
+package at.samuli100;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -9,7 +9,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Handles the leaderboard UI for achievement tracking

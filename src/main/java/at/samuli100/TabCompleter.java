@@ -1,4 +1,4 @@
-package at.hexle;
+package at.samuli100;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;

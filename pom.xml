@@ -39,7 +39,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>at.hexle.AllAchievements</mainClass>
+                            <mainClass>at.samuli100.AllAchievements</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

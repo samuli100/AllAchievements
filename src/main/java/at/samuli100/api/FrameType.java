@@ -1,4 +1,4 @@
-package at.hexle.api;
+package at.samuli100.api;
 
 import com.google.common.collect.Sets;
 
