@@ -119,6 +119,11 @@ public class Events implements Listener {
         // If advancement wasn't processed (game is paused), don't continue
         if (!processed) return;
 
+        // Update the BossBar immediately to reflect the new completion status
+        if (player.isOnline()) {
+            AllAchievements.getInstance().getBossBarManager().updatePlayerBossBar(player);
+        }
+
         // Get total advancement count and completed count for this specific player
         List<Advancement> totalAdvancements = AllAchievements.getInstance().getAdvancementList();
         int completedCount = AllAchievements.getInstance().getPlayerManager()
@@ -170,6 +175,9 @@ public class Events implements Listener {
                 for (UUID teamPlayerId : gameModeManager.getActivePlayers()) {
                     Player teamPlayer = Bukkit.getPlayer(teamPlayerId);
                     if (teamPlayer != null && teamPlayer.isOnline()) {
+                        // Update BossBar for all team members
+                        AllAchievements.getInstance().getBossBarManager().updatePlayerBossBar(teamPlayer);
+
                         teamPlayer.sendMessage("§7------- §6AllAchievements §aCoop§7 ---------");
                         teamPlayer.sendMessage("§6Team progress: " + teamCompletedCount + "/" + totalAdvancements.size() + " achievements!");
                         teamPlayer.sendMessage("§7------------------------------");
@@ -249,6 +257,9 @@ public class Events implements Listener {
             player.sendMessage("§cAdvancements will not be counted while the game is paused.");
             player.sendMessage("§7------------------------------");
 
+            // Update BossBar to show paused state
+            AllAchievements.getInstance().getBossBarManager().updatePlayerBossBar(player);
+
             pauseNotified.put(playerId, true);
         }
     }
@@ -259,14 +270,22 @@ public class Events implements Listener {
     public void resetPauseNotifications() {
         pauseNotified.clear();
         pausedAdvancements.clear();
+
+        // Update BossBars to show resumed state
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            AllAchievements.getInstance().getBossBarManager().updatePlayerBossBar(player);
+        }
     }
 
     @EventHandler
     public void onInvClick(InventoryClickEvent event) {
         String title = event.getView().getTitle();
 
-        // Always cancel clicks in custom UIs
-        if (title.contains("§6")) {
+        // Check if this is a backpack inventory
+        boolean isBackpack = event.getInventory().getHolder() instanceof Backpack.BackpackHolder;
+
+        // Only cancel clicks in custom UIs that are NOT backpacks
+        if (title.contains("§6") && !isBackpack) {
             event.setCancelled(true);
         }
 
@@ -379,8 +398,16 @@ public class Events implements Listener {
         // Load player data if not already loaded
         AllAchievements.getInstance().getPlayerManager().loadPlayerData(playerId);
 
-        // If player joins during active COOP game and is in the active players list, sync them
+        // Initialize the BossBar for this player if they are part of an active game
         GameModeManager gameModeManager = AllAchievements.getInstance().getGameModeManager();
+        PlayerManager.PlayerData data = AllAchievements.getInstance().getPlayerManager().getPlayerData(playerId);
+
+        if ((gameModeManager.isGameActive() && gameModeManager.isPlayerActive(playerId)) ||
+                (data.getTimerSeconds() > 0 || data.isTimerRunning())) {
+            AllAchievements.getInstance().getBossBarManager().updatePlayerBossBar(player);
+        }
+
+        // If player joins during active COOP game and is in the active players list, sync them
         if (gameModeManager.isGameActive() &&
                 gameModeManager.getGameMode() == GameModeManager.GameMode.COOP &&
                 gameModeManager.isPlayerActive(playerId)) {
@@ -403,6 +430,9 @@ public class Events implements Listener {
 
         // Save player data when they leave
         AllAchievements.getInstance().getPlayerManager().savePlayerData(playerId);
+
+        // Hide the BossBar when player leaves
+        AllAchievements.getInstance().getBossBarManager().hidePlayerBossBar(playerId);
 
         // Remove from notification maps
         pauseNotified.remove(playerId);

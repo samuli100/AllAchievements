@@ -1,8 +1,6 @@
 package at.hexle;
 
 import at.hexle.api.AdvancementInfo;
-import net.md_5.bungee.api.ChatMessageType;
-import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
 import org.bukkit.advancement.Advancement;
 import org.bukkit.entity.Player;
@@ -26,6 +24,9 @@ public class AllAchievements extends JavaPlugin implements Listener {
     // Game mode manager for coop/versus modes
     private GameModeManager gameModeManager;
     private Backpack backpackManager;
+
+    // BossBar manager for UI display
+    private BossBarManager bossBarManager;
 
     private static AllAchievements instance;
 
@@ -51,6 +52,9 @@ public class AllAchievements extends JavaPlugin implements Listener {
         // Initialize backpack manager
         backpackManager = new Backpack(this);
         Bukkit.getPluginManager().registerEvents(backpackManager, this);
+
+        // Initialize BossBar manager
+        bossBarManager = new BossBarManager(this);
 
         Bukkit.getConsoleSender().sendMessage("AllAchievements");
         // FIXED: Add 1.21 to the supported versions list and reverse the logic
@@ -79,7 +83,7 @@ public class AllAchievements extends JavaPlugin implements Listener {
         Events eventsListener = new Events();
         Bukkit.getPluginManager().registerEvents(eventsListener, this);
 
-        // Timer task - now updates player-specific timers
+        // Timer task - now updates player-specific timers and BossBars
         Bukkit.getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
             @Override
             public void run() {
@@ -93,7 +97,7 @@ public class AllAchievements extends JavaPlugin implements Listener {
                     playerManager.updateTimers();
                 }
 
-                // Update action bar for each player
+                // Update the BossBar for each player
                 for(Player player : Bukkit.getOnlinePlayers()){
                     UUID playerId = player.getUniqueId();
 
@@ -105,44 +109,9 @@ public class AllAchievements extends JavaPlugin implements Listener {
 
                     PlayerManager.PlayerData data = playerManager.getPlayerData(playerId);
 
-                    // Display timer or just a default message
+                    // Display BossBar for active players
                     if(data.getTimerSeconds() > 0 || data.isTimerRunning()){
-                        String gameMode = "";
-                        String timerValue = "";
-
-                        // For COOP mode, show the shared timer for everyone
-                        if (gameModeManager.getGameMode() == GameModeManager.GameMode.COOP) {
-                            gameMode = " §7[§aCoop§7]";
-
-                            // Format the shared timer
-                            int seconds = gameModeManager.getCoopSharedTimer();
-                            int hours = seconds / 3600;
-                            int remainder = seconds % 3600;
-                            int minutes = remainder / 60;
-                            int secs = remainder % 60;
-                            timerValue = String.format("§6%02d:%02d:%02d", hours, minutes, secs);
-                        } else if (gameModeManager.getGameMode() == GameModeManager.GameMode.VERSUS) {
-                            gameMode = " §7[§cVersus§7]";
-                            timerValue = playerManager.getFormattedTime(playerId);
-                        } else {
-                            timerValue = playerManager.getFormattedTime(playerId);
-                        }
-
-                        // Get player progress
-                        int total = advancementList.size();
-                        int completed = playerManager.getPlayerData(playerId).getCompletedAdvancements().size();
-                        String progress = String.format("§7[%d/%d]", completed, total);
-
-                        // Show timer with game mode and progress
-                        player.spigot().sendMessage(
-                                ChatMessageType.ACTION_BAR,
-                                TextComponent.fromLegacyText(timerValue + gameMode + " " + progress)
-                        );
-                    } else {
-                        player.spigot().sendMessage(
-                                ChatMessageType.ACTION_BAR,
-                                TextComponent.fromLegacyText("§6--:--")
-                        );
+                        bossBarManager.updatePlayerBossBar(player);
                     }
                 }
             }
@@ -154,6 +123,10 @@ public class AllAchievements extends JavaPlugin implements Listener {
     @Override
     public void onDisable(){
         Bukkit.getConsoleSender().sendMessage("Plugin shutdown...");
+        // Clean up BossBars
+        if (bossBarManager != null) {
+            bossBarManager.cleanup();
+        }
         // Save all player data
         playerManager.saveAllPlayerData();
         // Save game mode data
@@ -220,6 +193,11 @@ public class AllAchievements extends JavaPlugin implements Listener {
     // Reset progress for a specific player
     public void reset(UUID playerId){
         playerManager.resetPlayer(playerId);
+
+        // Hide BossBar when resetting a player
+        if (bossBarManager != null) {
+            bossBarManager.hidePlayerBossBar(playerId);
+        }
     }
 
     // Get formatted time for a specific player
@@ -251,6 +229,10 @@ public class AllAchievements extends JavaPlugin implements Listener {
 
     public GameModeManager getGameModeManager() {
         return gameModeManager;
+    }
+
+    public BossBarManager getBossBarManager() {
+        return bossBarManager;
     }
 
     public static AllAchievements getInstance(){
